@@ -29,6 +29,7 @@ struct AppearanceSettingsPane: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
+                displayProfilePart
                 notchPersonalizationPart
                 sessionListPersonalizationPart
             }
@@ -37,6 +38,84 @@ struct AppearanceSettingsPane: View {
         }
         .background(Color(red: 0.055, green: 0.055, blue: 0.06))
         .navigationTitle(lang.t("settings.tab.appearance"))
+    }
+
+    // MARK: - Display profile
+
+    private var displayProfilePart: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader(
+                title: lang.t("settings.appearance.profile.title"),
+                note: lang.t("settings.appearance.profile.note")
+            )
+
+            HStack(spacing: 12) {
+                displayProfileCard(
+                    .topBar,
+                    icon: "display",
+                    title: lang.t("settings.appearance.profile.external.title"),
+                    note: lang.t("settings.appearance.profile.external.note")
+                )
+                displayProfileCard(
+                    .notch,
+                    icon: "laptopcomputer",
+                    title: lang.t("settings.appearance.profile.macbook.title"),
+                    note: lang.t("settings.appearance.profile.macbook.note")
+                )
+            }
+        }
+    }
+
+    private func displayProfileCard(
+        _ profile: IslandAppearanceDisplayProfile,
+        icon: String,
+        title: String,
+        note: String
+    ) -> some View {
+        let selected = editingProfile == profile
+        return Button {
+            model.appearanceSettingsProfile = profile
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(selected ? V6Palette.paper : V6Palette.paper.opacity(0.55))
+                    .frame(width: 34, height: 34)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.white.opacity(selected ? 0.11 : 0.05))
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(V6Palette.paper.opacity(0.94))
+                    Text(note)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(V6Palette.paper.opacity(0.42))
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 8)
+
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(V6Palette.paper.opacity(0.9))
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(selected ? 0.075 : 0.025))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(selected ? V6Palette.paper.opacity(0.86) : Color.white.opacity(0.08), lineWidth: selected ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Notch part
@@ -131,19 +210,6 @@ struct AppearanceSettingsPane: View {
 
     private var previewControls: some View {
         HStack(spacing: 10) {
-            Picker("", selection: Binding(
-                get: { model.appearanceSettingsProfile },
-                set: { model.appearanceSettingsProfile = $0 }
-            )) {
-                Text(lang.t("settings.appearance.preview.external")).tag(IslandAppearanceDisplayProfile.topBar)
-                Text(lang.t("settings.appearance.preview.macbook")).tag(IslandAppearanceDisplayProfile.notch)
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(width: 160)
-
-            Spacer(minLength: 8)
-
             // Auto-cycle toggle (default on — drives the state chips).
             monoChip(
                 title: previewAutoCycle
@@ -161,6 +227,8 @@ struct AppearanceSettingsPane: View {
                     previewMode = mode
                 }
             }
+
+            Spacer(minLength: 0)
         }
         .onAppear(perform: restartAutoCycleTick)
         .onChange(of: previewAutoCycle) { _, on in

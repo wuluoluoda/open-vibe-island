@@ -67,6 +67,12 @@
 "settings.appearance.notchPart.title" = "Notch";
 "settings.appearance.sessionListPart.title" = "会话列表";
 "settings.appearance.sessionPreview" = "预览";
+"settings.appearance.profile.title" = "显示器配置";
+"settings.appearance.profile.note" = "选择正在配置的屏幕类型。Open Island 会在悬浮窗切换屏幕时自动应用对应配置。";
+"settings.appearance.profile.external.title" = "外接屏";
+"settings.appearance.profile.external.note" = "顶部栏 fallback，不使用 MacBook 刘海外圆角。";
+"settings.appearance.profile.macbook.title" = "MacBook 刘海屏";
+"settings.appearance.profile.macbook.note" = "内置刘海屏 surface，保留刘海感知几何。";
 "settings.appearance.stateIndicator.title" = "03 · 会话状态";
 "settings.appearance.stateIndicator.note" = "控制列表行如何呈现运行、等待和完成状态。";
 "settings.appearance.stateIndicator.animatedDot" = "动效点";

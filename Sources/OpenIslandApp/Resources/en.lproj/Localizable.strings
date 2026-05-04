@@ -67,6 +67,12 @@
 "settings.appearance.notchPart.title" = "Notch";
 "settings.appearance.sessionListPart.title" = "Session list";
 "settings.appearance.sessionPreview" = "Preview";
+"settings.appearance.profile.title" = "Display profile";
+"settings.appearance.profile.note" = "Choose which screen type you are configuring. Open Island applies the matching profile automatically when the overlay moves.";
+"settings.appearance.profile.external.title" = "External display";
+"settings.appearance.profile.external.note" = "Top-bar fallback without the MacBook notch corners.";
+"settings.appearance.profile.macbook.title" = "MacBook notch";
+"settings.appearance.profile.macbook.note" = "Built-in notch surface with notch-aware geometry.";
 "settings.appearance.stateIndicator.title" = "03 · Session state";
 "settings.appearance.stateIndicator.note" = "How rows show running, waiting, and completed state.";
 "settings.appearance.stateIndicator.animatedDot" = "Animated dot";
