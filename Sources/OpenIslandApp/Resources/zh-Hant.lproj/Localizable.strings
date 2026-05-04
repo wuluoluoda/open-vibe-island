@@ -64,6 +64,9 @@
 "settings.appearance.centerLabel.agentAction" = "Agent · 動作";
 "settings.appearance.centerLabel.sessionName" = "會話名";
 "settings.appearance.centerLabel.off" = "關閉";
+"settings.appearance.notchPart.title" = "Notch";
+"settings.appearance.sessionListPart.title" = "會話列表";
+"settings.appearance.sessionPreview" = "預覽";
 "settings.appearance.stateIndicator.title" = "03 · 會話狀態";
 "settings.appearance.stateIndicator.note" = "控制列表列如何呈現執行、等待和完成狀態。";
 "settings.appearance.stateIndicator.animatedDot" = "動效點";

@@ -22,14 +22,9 @@ struct AppearanceSettingsPane: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                previewSection
-                rightSlotSection
-                centerLabelSection
-                stateIndicatorSection
-                sessionGroupSection
-                sessionSortSection
-                staleThresholdSection
+            VStack(alignment: .leading, spacing: 32) {
+                notchPersonalizationPart
+                sessionListPersonalizationPart
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -38,7 +33,31 @@ struct AppearanceSettingsPane: View {
         .navigationTitle(lang.t("settings.tab.appearance"))
     }
 
-    // MARK: - Preview
+    // MARK: - Notch part
+
+    private var notchPersonalizationPart: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            partHeader(title: lang.t("settings.appearance.notchPart.title"))
+            previewSection
+            rightSlotSection
+            centerLabelSection
+        }
+    }
+
+    // MARK: - Session list part
+
+    private var sessionListPersonalizationPart: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            partHeader(title: lang.t("settings.appearance.sessionListPart.title"))
+            sessionListPreviewSection
+            stateIndicatorSection
+            sessionGroupSection
+            sessionSortSection
+            staleThresholdSection
+        }
+    }
+
+    // MARK: - Notch preview
 
     @ViewBuilder
     private var previewSection: some View {
@@ -139,6 +158,52 @@ struct AppearanceSettingsPane: View {
         .onChange(of: previewAutoCycle) { _, on in
             if on { restartAutoCycleTick() }
         }
+    }
+
+    // MARK: - Session list preview
+
+    @ViewBuilder
+    private var sessionListPreviewSection: some View {
+        sectionHeader(title: lang.t("settings.appearance.sessionPreview"), note: nil)
+
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(previewSessionSections) { section in
+                VStack(alignment: .leading, spacing: 6) {
+                    if model.islandSessionGroup != .none {
+                        HStack(spacing: 8) {
+                            Text(section.title.uppercased())
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.42))
+                            Text("\(section.items.count)")
+                                .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.32))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.white.opacity(0.055), in: Capsule())
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 4)
+                    }
+
+                    ForEach(section.items) { item in
+                        SessionListLivePreviewRow(
+                            item: item,
+                            indicator: model.islandSessionStateIndicator
+                        )
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(red: 0.1, green: 0.1, blue: 0.115))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
     }
 
     // Simple self-scheduling tick. We don't use `Timer.publish` so the
@@ -378,6 +443,12 @@ struct AppearanceSettingsPane: View {
 
     // MARK: - Helpers
 
+    private func partHeader(title: String) -> some View {
+        Text(title)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.92))
+    }
+
     private func optionCard<Icon: View>(
         selected: Bool,
         title: String,
@@ -523,9 +594,261 @@ struct AppearanceSettingsPane: View {
             return .agents(previewAgentCells)
         }
     }
+
+    private var previewSessionSections: [AppearanceSessionPreviewSection] {
+        let items = sortedPreviewSessionItems
+
+        switch model.islandSessionGroup {
+        case .none:
+            return [
+                AppearanceSessionPreviewSection(
+                    id: "all",
+                    title: lang.t("settings.appearance.sessionGroup.none"),
+                    items: items
+                )
+            ]
+        case .state:
+            let groups: [(String, String, (AppearanceSessionPreviewItem) -> Bool)] = [
+                ("approval", "Needs approval", { $0.phase == .approval }),
+                ("answer", "Needs answer", { $0.phase == .answer }),
+                ("running", "In progress", { $0.phase == .running }),
+                ("done", "Just done", { $0.phase == .done }),
+                ("idle", "Idle", { $0.phase == .idle }),
+            ]
+            return groups.compactMap { id, title, include in
+                let groupItems = items.filter(include)
+                guard !groupItems.isEmpty else { return nil }
+                return AppearanceSessionPreviewSection(id: id, title: title, items: groupItems)
+            }
+        case .agent:
+            let groups = ["Codex", "Claude", "Cursor", "Gemini"]
+            return groups.compactMap { agent in
+                let groupItems = items.filter { $0.agent == agent }
+                guard !groupItems.isEmpty else { return nil }
+                return AppearanceSessionPreviewSection(id: agent, title: agent, items: groupItems)
+            }
+        case .project:
+            let groups = ["open-island", "website", "docs"]
+            return groups.compactMap { project in
+                let groupItems = items.filter { $0.project == project }
+                guard !groupItems.isEmpty else { return nil }
+                return AppearanceSessionPreviewSection(id: project, title: project, items: groupItems)
+            }
+        }
+    }
+
+    private var sortedPreviewSessionItems: [AppearanceSessionPreviewItem] {
+        switch model.islandSessionSort {
+        case .attention:
+            return previewSessionItems.sorted { lhs, rhs in
+                if lhs.attentionRank == rhs.attentionRank {
+                    return lhs.updatedRank < rhs.updatedRank
+                }
+                return lhs.attentionRank < rhs.attentionRank
+            }
+        case .lastUpdate:
+            return previewSessionItems.sorted { $0.updatedRank < $1.updatedRank }
+        }
+    }
+
+    private var previewSessionItems: [AppearanceSessionPreviewItem] {
+        [
+            .init(
+                id: "approval",
+                title: "Codex · open-island",
+                detail: "Approve shell command",
+                agent: "Codex",
+                project: "open-island",
+                age: "now",
+                phase: .approval,
+                attentionRank: 0,
+                updatedRank: 2
+            ),
+            .init(
+                id: "answer",
+                title: "Claude · open-island",
+                detail: "Waiting for answer",
+                agent: "Claude",
+                project: "open-island",
+                age: "1m",
+                phase: .answer,
+                attentionRank: 1,
+                updatedRank: 3
+            ),
+            .init(
+                id: "running",
+                title: "Cursor · website",
+                detail: "Editing session list preview",
+                agent: "Cursor",
+                project: "website",
+                age: "2m",
+                phase: .running,
+                attentionRank: 2,
+                updatedRank: 0
+            ),
+            .init(
+                id: "done",
+                title: "Gemini · docs",
+                detail: "Reply available",
+                agent: "Gemini",
+                project: "docs",
+                age: title(for: model.completedStaleThreshold),
+                phase: .done,
+                attentionRank: 3,
+                updatedRank: 1
+            ),
+            .init(
+                id: "idle",
+                title: "Codex · open-island",
+                detail: "Completed earlier",
+                agent: "Codex",
+                project: "open-island",
+                age: "idle",
+                phase: .idle,
+                attentionRank: 4,
+                updatedRank: 4
+            ),
+        ]
+    }
 }
 
 // MARK: - Small preview ornaments
+
+private struct AppearanceSessionPreviewSection: Identifiable {
+    let id: String
+    let title: String
+    let items: [AppearanceSessionPreviewItem]
+}
+
+private struct AppearanceSessionPreviewItem: Identifiable {
+    enum Phase {
+        case approval
+        case answer
+        case running
+        case done
+        case idle
+    }
+
+    let id: String
+    let title: String
+    let detail: String
+    let agent: String
+    let project: String
+    let age: String
+    let phase: Phase
+    let attentionRank: Int
+    let updatedRank: Int
+}
+
+private struct SessionListLivePreviewRow: View {
+    let item: AppearanceSessionPreviewItem
+    let indicator: IslandSessionStateIndicator
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            indicatorView
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(item.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(headlineColor)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    Text(item.age)
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(item.phase == .idle ? 0.32 : 0.46))
+                }
+
+                Text(item.detail)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(item.phase == .idle ? 0.34 : 0.58))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(rowFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.white.opacity(item.phase == .idle ? 0.035 : 0.055))
+        )
+        .opacity(item.phase == .idle ? 0.74 : 1)
+    }
+
+    @ViewBuilder
+    private var indicatorView: some View {
+        switch indicator {
+        case .animatedDot:
+            Circle()
+                .fill(tint)
+                .frame(width: 9, height: 9)
+                .shadow(color: tint.opacity(item.phase == .idle ? 0 : 0.44), radius: 5)
+                .padding(.top, 4)
+                .frame(width: 12, height: 22, alignment: .top)
+        case .bar:
+            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                .fill(tint)
+                .frame(width: 4, height: 28)
+                .padding(.top, 1)
+                .frame(width: 12, height: 30, alignment: .top)
+        case .glyph:
+            Image(systemName: glyphName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 12, height: 18)
+                .padding(.top, 1)
+        case .tint:
+            Circle()
+                .fill(tint.opacity(item.phase == .idle ? 0.5 : 0.9))
+                .frame(width: 8, height: 8)
+                .padding(.top, 5)
+                .frame(width: 12, height: 22, alignment: .top)
+        }
+    }
+
+    private var rowFill: Color {
+        guard indicator == .tint else { return Color.black.opacity(0.92) }
+        return tint.opacity(item.phase == .idle ? 0.04 : 0.09)
+    }
+
+    private var headlineColor: Color {
+        item.phase == .idle ? .white.opacity(0.72) : .white.opacity(0.92)
+    }
+
+    private var glyphName: String {
+        switch item.phase {
+        case .approval:
+            "exclamationmark.triangle.fill"
+        case .answer:
+            "questionmark.circle.fill"
+        case .running:
+            "circle.dashed"
+        case .done, .idle:
+            "checkmark.circle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch item.phase {
+        case .approval:
+            .orange.opacity(0.95)
+        case .answer:
+            .yellow.opacity(0.96)
+        case .running:
+            Color(red: 0.34, green: 0.61, blue: 0.99)
+        case .done:
+            Color(red: 0.29, green: 0.86, blue: 0.46)
+        case .idle:
+            .white.opacity(0.38)
+        }
+    }
+}
 
 private struct CountBadgePreview: View {
     let count: Int

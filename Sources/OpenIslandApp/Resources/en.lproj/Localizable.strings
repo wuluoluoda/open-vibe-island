@@ -64,6 +64,9 @@
 "settings.appearance.centerLabel.agentAction" = "Agent · action";
 "settings.appearance.centerLabel.sessionName" = "Session name";
 "settings.appearance.centerLabel.off" = "Off";
+"settings.appearance.notchPart.title" = "Notch";
+"settings.appearance.sessionListPart.title" = "Session list";
+"settings.appearance.sessionPreview" = "Preview";
 "settings.appearance.stateIndicator.title" = "03 · Session state";
 "settings.appearance.stateIndicator.note" = "How rows show running, waiting, and completed state.";
 "settings.appearance.stateIndicator.animatedDot" = "Animated dot";
