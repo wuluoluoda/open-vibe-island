@@ -1126,8 +1126,8 @@ private struct IslandSessionRow: View {
             .padding(.horizontal, isActionable ? 16 : 16)
             .padding(.vertical, isActionable ? 14 : 14)
 
-            if isActionable && showsDetail {
-                actionableBody
+            if showsDetail && shouldShowEmbeddedDetailBody {
+                embeddedDetailBody
                     .padding(.horizontal, 16)
                     .padding(.bottom, 14)
             }
@@ -1200,6 +1200,62 @@ private struct IslandSessionRow: View {
         case .running:
             EmptyView()
         }
+    }
+
+    private var shouldShowEmbeddedDetailBody: Bool {
+        if session.phase.requiresAttention || session.phase == .completed {
+            return true
+        }
+        return session.phase == .running && runningDetailText != nil
+    }
+
+    @ViewBuilder
+    private var embeddedDetailBody: some View {
+        switch session.phase {
+        case .waitingForApproval, .waitingForAnswer, .completed:
+            actionableBody
+        case .running:
+            runningDetailBody
+        }
+    }
+
+    private var runningDetailBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(lang.t("settings.appearance.state.running"))
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.42))
+                .textCase(.uppercase)
+
+            if let runningDetailText {
+                Text(runningDetailText)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.82))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.045))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(.white.opacity(0.06))
+                    )
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.035))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.06))
+        )
     }
 
     // MARK: - Approval action area
@@ -1389,6 +1445,20 @@ private struct IslandSessionRow: View {
         return session.permissionRequest?.summary.trimmedForNotificationCard ?? session.summary.trimmedForNotificationCard
     }
 
+    private var runningDetailText: String? {
+        if let preview = session.currentCommandPreviewText?.trimmedForNotificationCard,
+           !preview.isEmpty {
+            return "$ \(preview)"
+        }
+
+        if let activity = session.spotlightActivityLineText?.trimmedForNotificationCard,
+           !activity.isEmpty {
+            return activity
+        }
+
+        let summary = session.summary.trimmedForNotificationCard
+        return summary.isEmpty ? nil : summary
+    }
 
     private func subagentElapsed(since start: Date, at now: Date) -> String {
         let seconds = Int(now.timeIntervalSince(start))
