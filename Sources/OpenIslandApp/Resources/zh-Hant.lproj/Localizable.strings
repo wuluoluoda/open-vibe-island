@@ -64,6 +64,28 @@
 "settings.appearance.centerLabel.agentAction" = "Agent · 動作";
 "settings.appearance.centerLabel.sessionName" = "會話名";
 "settings.appearance.centerLabel.off" = "關閉";
+"settings.appearance.stateIndicator.title" = "03 · 會話狀態";
+"settings.appearance.stateIndicator.note" = "控制列表列如何呈現執行、等待和完成狀態。";
+"settings.appearance.stateIndicator.animatedDot" = "動效點";
+"settings.appearance.stateIndicator.bar" = "直條";
+"settings.appearance.stateIndicator.glyph" = "圖示";
+"settings.appearance.stateIndicator.tint" = "底色";
+"settings.appearance.sessionGroup.title" = "04 · 會話分組";
+"settings.appearance.sessionGroup.note" = "展開會話列表中的可選分組。";
+"settings.appearance.sessionGroup.none" = "不分組";
+"settings.appearance.sessionGroup.state" = "狀態";
+"settings.appearance.sessionGroup.agent" = "Agent";
+"settings.appearance.sessionGroup.project" = "專案";
+"settings.appearance.sessionSort.title" = "05 · 會話排序";
+"settings.appearance.sessionSort.note" = "選擇展開列表中的預設排序。";
+"settings.appearance.sessionSort.attention" = "優先級";
+"settings.appearance.sessionSort.lastUpdate" = "最近更新";
+"settings.appearance.staleThreshold.title" = "06 · 完成逾時";
+"settings.appearance.staleThreshold.note" = "完成會話經過這段時間後會降到低優先級閒置展示。";
+"settings.appearance.staleThreshold.twoMinutes" = "2 分鐘";
+"settings.appearance.staleThreshold.fiveMinutes" = "5 分鐘";
+"settings.appearance.staleThreshold.tenMinutes" = "10 分鐘";
+"settings.appearance.staleThreshold.twentyMinutes" = "20 分鐘";
 
 /* Settings - Display */
 "settings.display.monitor" = "顯示器";

@@ -26,6 +26,10 @@ struct AppearanceSettingsPane: View {
                 previewSection
                 rightSlotSection
                 centerLabelSection
+                stateIndicatorSection
+                sessionGroupSection
+                sessionSortSection
+                staleThresholdSection
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -273,7 +277,144 @@ struct AppearanceSettingsPane: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - 03 · Session state
+
+    @ViewBuilder
+    private var stateIndicatorSection: some View {
+        sectionHeader(
+            title: lang.t("settings.appearance.stateIndicator.title"),
+            note: lang.t("settings.appearance.stateIndicator.note")
+        )
+
+        HStack(spacing: 12) {
+            stateIndicatorCard(.animatedDot)
+            stateIndicatorCard(.bar)
+            stateIndicatorCard(.glyph)
+            stateIndicatorCard(.tint)
+        }
+    }
+
+    private func stateIndicatorCard(_ option: IslandSessionStateIndicator) -> some View {
+        optionCard(
+            selected: model.islandSessionStateIndicator == option,
+            title: title(for: option)
+        ) {
+            model.islandSessionStateIndicator = option
+        } icon: {
+            StateIndicatorPreview(option: option)
+        }
+    }
+
+    // MARK: - 04 · Session grouping
+
+    @ViewBuilder
+    private var sessionGroupSection: some View {
+        sectionHeader(
+            title: lang.t("settings.appearance.sessionGroup.title"),
+            note: lang.t("settings.appearance.sessionGroup.note")
+        )
+
+        HStack(spacing: 12) {
+            ForEach(IslandSessionGroup.allCases) { option in
+                optionCard(
+                    selected: model.islandSessionGroup == option,
+                    title: title(for: option)
+                ) {
+                    model.islandSessionGroup = option
+                } icon: {
+                    SessionGroupPreview(option: option)
+                }
+            }
+        }
+    }
+
+    // MARK: - 05 · Session sorting
+
+    @ViewBuilder
+    private var sessionSortSection: some View {
+        sectionHeader(
+            title: lang.t("settings.appearance.sessionSort.title"),
+            note: lang.t("settings.appearance.sessionSort.note")
+        )
+
+        HStack(spacing: 12) {
+            ForEach(IslandSessionSort.allCases) { option in
+                optionCard(
+                    selected: model.islandSessionSort == option,
+                    title: title(for: option)
+                ) {
+                    model.islandSessionSort = option
+                } icon: {
+                    SessionSortPreview(option: option)
+                }
+            }
+        }
+    }
+
+    // MARK: - 06 · Done timeout
+
+    @ViewBuilder
+    private var staleThresholdSection: some View {
+        sectionHeader(
+            title: lang.t("settings.appearance.staleThreshold.title"),
+            note: lang.t("settings.appearance.staleThreshold.note")
+        )
+
+        HStack(spacing: 12) {
+            ForEach(IslandCompletedStaleThreshold.allCases) { option in
+                optionCard(
+                    selected: model.completedStaleThreshold == option,
+                    title: title(for: option)
+                ) {
+                    model.completedStaleThreshold = option
+                } icon: {
+                    Text(title(for: option))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(V6Palette.paper.opacity(0.9))
+                }
+            }
+        }
+    }
+
     // MARK: - Helpers
+
+    private func optionCard<Icon: View>(
+        selected: Bool,
+        title: String,
+        action: @escaping () -> Void,
+        @ViewBuilder icon: () -> Icon
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
+                    icon()
+                }
+                .frame(height: 56)
+
+                Text(title)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(selected ? 0.07 : 0.02))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        selected ? V6Palette.paper.opacity(0.9) : Color.white.opacity(0.08),
+                        lineWidth: selected ? 1.5 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
 
     private func sectionHeader(title: String, note: String?) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -312,6 +453,40 @@ struct AppearanceSettingsPane: View {
         case .idle:    lang.t("settings.appearance.state.idle")
         case .running: lang.t("settings.appearance.state.running")
         case .waiting: lang.t("settings.appearance.state.waiting")
+        }
+    }
+
+    private func title(for option: IslandSessionStateIndicator) -> String {
+        switch option {
+        case .animatedDot: lang.t("settings.appearance.stateIndicator.animatedDot")
+        case .bar:         lang.t("settings.appearance.stateIndicator.bar")
+        case .glyph:       lang.t("settings.appearance.stateIndicator.glyph")
+        case .tint:        lang.t("settings.appearance.stateIndicator.tint")
+        }
+    }
+
+    private func title(for option: IslandSessionGroup) -> String {
+        switch option {
+        case .none:    lang.t("settings.appearance.sessionGroup.none")
+        case .state:   lang.t("settings.appearance.sessionGroup.state")
+        case .agent:   lang.t("settings.appearance.sessionGroup.agent")
+        case .project: lang.t("settings.appearance.sessionGroup.project")
+        }
+    }
+
+    private func title(for option: IslandSessionSort) -> String {
+        switch option {
+        case .attention:  lang.t("settings.appearance.sessionSort.attention")
+        case .lastUpdate: lang.t("settings.appearance.sessionSort.lastUpdate")
+        }
+    }
+
+    private func title(for option: IslandCompletedStaleThreshold) -> String {
+        switch option {
+        case .twoMinutes:    lang.t("settings.appearance.staleThreshold.twoMinutes")
+        case .fiveMinutes:   lang.t("settings.appearance.staleThreshold.fiveMinutes")
+        case .tenMinutes:    lang.t("settings.appearance.staleThreshold.tenMinutes")
+        case .twentyMinutes: lang.t("settings.appearance.staleThreshold.twentyMinutes")
         }
     }
 
@@ -382,3 +557,130 @@ private struct AgentsMiniGridPreview: View {
     }
 }
 
+private struct StateIndicatorPreview: View {
+    let option: IslandSessionStateIndicator
+
+    var body: some View {
+        HStack(spacing: 8) {
+            indicator
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(V6Palette.paper.opacity(option == .tint ? 0.55 : 0.22))
+                .frame(width: 58, height: 6)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(option == .tint ? Color(hex: AgentTool.codex.brandColorHex)?.opacity(0.22) ?? Color.white.opacity(0.08) : Color.clear)
+        )
+    }
+
+    @ViewBuilder
+    private var indicator: some View {
+        let color = Color(hex: AgentTool.codex.brandColorHex) ?? V6Palette.paper
+        switch option {
+        case .animatedDot:
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+                .shadow(color: color.opacity(0.55), radius: 5)
+        case .bar:
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(color)
+                .frame(width: 4, height: 28)
+        case .glyph:
+            Image(systemName: "sparkle")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(color)
+        case .tint:
+            Circle()
+                .fill(V6Palette.paper.opacity(0.72))
+                .frame(width: 10, height: 10)
+        }
+    }
+}
+
+private struct SessionGroupPreview: View {
+    let option: IslandSessionGroup
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            switch option {
+            case .none:
+                previewLine(width: 72, color: V6Palette.paper.opacity(0.42))
+                previewLine(width: 54, color: V6Palette.paper.opacity(0.28))
+                previewLine(width: 64, color: V6Palette.paper.opacity(0.22))
+            case .state:
+                groupBlock(width: 52)
+                groupBlock(width: 70)
+            case .agent:
+                agentBlock(color: Color(hex: AgentTool.claudeCode.brandColorHex) ?? .white)
+                agentBlock(color: Color(hex: AgentTool.codex.brandColorHex) ?? .white)
+            case .project:
+                groupBlock(width: 76)
+                groupBlock(width: 46)
+            }
+        }
+        .frame(width: 84, alignment: .leading)
+    }
+
+    private func previewLine(width: CGFloat, color: Color) -> some View {
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(color)
+            .frame(width: width, height: 5)
+    }
+
+    private func groupBlock(width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            previewLine(width: width * 0.48, color: V6Palette.paper.opacity(0.48))
+            previewLine(width: width, color: V6Palette.paper.opacity(0.22))
+        }
+    }
+
+    private func agentBlock(color: Color) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+            previewLine(width: 54, color: V6Palette.paper.opacity(0.25))
+        }
+    }
+}
+
+private struct SessionSortPreview: View {
+    let option: IslandSessionSort
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(rows.indices, id: \.self) { index in
+                HStack(spacing: 6) {
+                    Text(rows[index].rank)
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(V6Palette.paper.opacity(0.55))
+                        .frame(width: 12, alignment: .leading)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(rows[index].color)
+                        .frame(width: rows[index].width, height: 5)
+                }
+            }
+        }
+        .frame(width: 82, alignment: .leading)
+    }
+
+    private var rows: [(rank: String, width: CGFloat, color: Color)] {
+        switch option {
+        case .attention:
+            return [
+                ("!", 62, Color(hex: AgentTool.claudeCode.brandColorHex) ?? .white),
+                ("2", 48, V6Palette.paper.opacity(0.28)),
+                ("3", 58, V6Palette.paper.opacity(0.2)),
+            ]
+        case .lastUpdate:
+            return [
+                ("1", 64, V6Palette.paper.opacity(0.38)),
+                ("2", 56, V6Palette.paper.opacity(0.3)),
+                ("3", 42, V6Palette.paper.opacity(0.22)),
+            ]
+        }
+    }
+}
