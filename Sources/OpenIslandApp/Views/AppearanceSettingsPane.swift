@@ -148,20 +148,13 @@ struct AppearanceSettingsPane: View {
     private var previewSection: some View {
         sectionHeader(title: lang.t("settings.appearance.preview"), note: nil)
 
-        VStack(spacing: 14) {
-            previewStage
-            previewControls
+        SettingsPreviewStage(contentTopPadding: 16, contentBottomPadding: 18) {
+            VStack(spacing: 14) {
+                previewStage
+                previewControls
+            }
+            .padding(.horizontal, 18)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(red: 0.1, green: 0.1, blue: 0.115))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
     }
 
     private var previewStage: some View {
@@ -173,8 +166,8 @@ struct AppearanceSettingsPane: View {
         return ZStack(alignment: .top) {
             LinearGradient(
                 colors: [
-                    Color(red: 0.16, green: 0.16, blue: 0.19),
-                    Color(red: 0.12, green: 0.12, blue: 0.14),
+                    Color.black.opacity(0.22),
+                    Color.black.opacity(0.34),
                 ],
                 startPoint: .top, endPoint: .bottom
             )
@@ -242,14 +235,16 @@ struct AppearanceSettingsPane: View {
     private var sessionListPreviewSection: some View {
         sectionHeader(title: lang.t("settings.appearance.sessionPreview"), note: nil)
 
-        SessionListPanelPreview(
-            sections: previewSessionSections,
-            showsSections: editingPreferences.sessionGroup != .none,
-            indicator: editingPreferences.sessionStateIndicator,
-            profile: editingProfile
-        )
+        SettingsPreviewStage(contentTopPadding: 0, contentBottomPadding: 28) {
+            SessionListPanelPreview(
+                sections: previewSessionSections,
+                showsSections: editingPreferences.sessionGroup != .none,
+                indicator: editingPreferences.sessionStateIndicator,
+                profile: editingProfile
+            )
+            .padding(.horizontal, 18)
+        }
         .padding(.top, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // Simple self-scheduling tick. We don't use `Timer.publish` so the
@@ -816,6 +811,82 @@ private struct AppearanceSessionPreviewItem: Identifiable {
     let updatedRank: Int
 }
 
+private struct SettingsPreviewStage<Content: View>: View {
+    var contentTopPadding: CGFloat = 20
+    var contentBottomPadding: CGFloat = 24
+    let content: Content
+
+    init(
+        contentTopPadding: CGFloat = 20,
+        contentBottomPadding: CGFloat = 24,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.contentTopPadding = contentTopPadding
+        self.contentBottomPadding = contentBottomPadding
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SettingsPreviewMenuBar()
+
+            content
+                .padding(.top, contentTopPadding)
+                .padding(.bottom, contentBottomPadding)
+        }
+        .frame(maxWidth: .infinity)
+        .background(SettingsPreviewWallpaper())
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+private struct SettingsPreviewMenuBar: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("Open Island")
+                .fontWeight(.semibold)
+            Text("File  Edit  View")
+            Spacer(minLength: 0)
+            Text("14:22")
+        }
+        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+        .foregroundStyle(.white.opacity(0.42))
+        .lineLimit(1)
+        .padding(.horizontal, 14)
+        .frame(height: 24)
+        .background(.black.opacity(0.12))
+    }
+}
+
+private struct SettingsPreviewWallpaper: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 60.0 / 255.0, green: 35.0 / 255.0, blue: 68.0 / 255.0),
+                    Color(red: 95.0 / 255.0, green: 46.0 / 255.0, blue: 88.0 / 255.0),
+                    Color(red: 168.0 / 255.0, green: 81.0 / 255.0, blue: 122.0 / 255.0),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.10),
+                    Color.black.opacity(0.26),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+}
+
 private struct SessionListPanelPreview: View {
     let sections: [AppearanceSessionPreviewSection]
     let showsSections: Bool
@@ -835,6 +906,19 @@ private struct SessionListPanelPreview: View {
     }
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            panel(width: preferredPanelWidth)
+            panel(width: 500)
+            panel(width: 460)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var preferredPanelWidth: CGFloat {
+        profile == .notch ? 540 : 520
+    }
+
+    private func panel(width: CGFloat) -> some View {
         ZStack(alignment: .top) {
             surfaceShape
                 .fill(V6Palette.ink)
@@ -848,9 +932,8 @@ private struct SessionListPanelPreview: View {
             }
             .clipShape(surfaceShape)
         }
-        .frame(width: 560)
+        .frame(width: width)
         .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var surfaceShape: OpenedIslandSurfaceShape {
@@ -858,7 +941,7 @@ private struct SessionListPanelPreview: View {
     }
 
     private var sideInset: CGFloat {
-        profile == .notch ? 30 : 16
+        profile == .notch ? 46 : 16
     }
 
     private var notchStrip: some View {
@@ -873,7 +956,8 @@ private struct SessionListPanelPreview: View {
                 .foregroundStyle(V6Palette.paper.opacity(0.45))
         }
         .frame(height: 32)
-        .padding(.horizontal, 14)
+        .padding(.leading, sideInset)
+        .padding(.trailing, sideInset)
     }
 
     private var panelHead: some View {
@@ -899,7 +983,7 @@ private struct SessionListPanelPreview: View {
                 .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .padding(.leading, sideInset)
-        .padding(.trailing, 12)
+        .padding(.trailing, sideInset)
         .padding(.vertical, 10)
         .overlay(alignment: .top) {
             Rectangle()
@@ -954,7 +1038,7 @@ private struct SessionListPanelPreview: View {
             Spacer(minLength: 0)
         }
         .padding(.leading, sideInset)
-        .padding(.trailing, 16)
+        .padding(.trailing, sideInset)
         .padding(.top, 9)
         .padding(.bottom, 6)
         .overlay(alignment: .top) {
@@ -981,7 +1065,7 @@ private struct SessionListPanelPreview: View {
         .font(.system(size: 10.5, weight: .medium, design: .monospaced))
         .foregroundStyle(V6Palette.paper.opacity(0.42))
         .padding(.leading, sideInset)
-        .padding(.trailing, 16)
+        .padding(.trailing, sideInset)
         .padding(.top, 9)
         .padding(.bottom, 14)
         .overlay(alignment: .top) {
@@ -1128,7 +1212,7 @@ private struct SessionListLivePreviewRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.leading, detailLeadingPadding)
-        .padding(.trailing, 16)
+        .padding(.trailing, sideInset)
         .padding(.bottom, 12)
         .background(.white.opacity(0.015))
     }
