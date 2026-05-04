@@ -187,6 +187,54 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func freshCompletedSessionsSortAheadOfV8StaleCompletedSessions() {
+        let now = Date()
+        let model = AppModel()
+
+        var staleCompleted = AgentSession(
+            id: "stale-completed",
+            title: "Codex · stale",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Finished earlier",
+            updatedAt: now.addingTimeInterval(-301),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "stale",
+                paneTitle: "codex ~/stale",
+                workingDirectory: "/tmp/stale",
+                terminalSessionID: "ghostty-stale"
+            )
+        )
+        staleCompleted.isProcessAlive = true
+
+        var freshCompleted = AgentSession(
+            id: "fresh-completed",
+            title: "Codex · fresh",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Finished just now",
+            updatedAt: now.addingTimeInterval(-299),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "fresh",
+                paneTitle: "codex ~/fresh",
+                workingDirectory: "/tmp/fresh",
+                terminalSessionID: "ghostty-fresh"
+            )
+        )
+        freshCompleted.isProcessAlive = true
+
+        model.state = SessionState(sessions: [staleCompleted, freshCompleted])
+
+        #expect(model.islandListSessions.map(\.id) == ["fresh-completed", "stale-completed"])
+    }
+
+    @Test
     func jumpToSessionClosesOverlayBeforeTerminalJumpFinishes() async throws {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel { _ in

@@ -17,6 +17,7 @@ enum IslandSessionPresence: Equatable {
 extension AgentSession {
     private static let collapsedDetailAgeThreshold: TimeInterval = 20 * 60
     private static let islandActivityThreshold: TimeInterval = 20 * 60
+    static let staleCompletedDisplayThreshold: TimeInterval = 5 * 60
 
     /// Whether this session represents a subagent (worktree agent) that should
     /// not appear as a separate entry in the session list.  The parent session
@@ -289,6 +290,13 @@ extension AgentSession {
         }
 
         return .inactive
+    }
+
+    /// v8 UI-only staleness: keep `SessionPhase.completed` unchanged, but
+    /// visually fold older completed rows into the low-priority presentation.
+    func isStaleCompletedForIsland(at referenceDate: Date) -> Bool {
+        phase == .completed
+            && referenceDate.timeIntervalSince(islandActivityDate) >= Self.staleCompletedDisplayThreshold
     }
 
     private var spotlightRunningActivityText: String? {
