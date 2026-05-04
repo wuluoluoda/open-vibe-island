@@ -1069,8 +1069,8 @@ private struct IslandSessionRow: View {
                                 HStack(spacing: 6) {
                                     Circle()
                                         .fill(sub.summary != nil
-                                            ? Color(red: 0.29, green: 0.86, blue: 0.46)
-                                            : Color(red: 0.34, green: 0.61, blue: 0.99))
+                                            ? IslandDesignPalette.Status.completed
+                                            : IslandDesignPalette.Status.running)
                                         .frame(width: 6, height: 6)
                                     Text(sub.agentType ?? sub.agentID)
                                         .font(.system(size: 11, weight: .medium))
@@ -1175,16 +1175,7 @@ private struct IslandSessionRow: View {
     }
 
     private var actionableStatusTint: Color {
-        switch session.phase {
-        case .waitingForApproval:
-            .orange
-        case .waitingForAnswer:
-            .yellow
-        case .running:
-            Color(red: 0.34, green: 0.61, blue: 0.99)
-        case .completed:
-            Color(red: 0.29, green: 0.86, blue: 0.46)
-        }
+        IslandDesignPalette.Status.tint(for: session.phase)
     }
 
     @ViewBuilder
@@ -1264,10 +1255,10 @@ private struct IslandSessionRow: View {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(IslandDesignPalette.Status.waitingForApproval)
                 Text(commandLabel)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(IslandDesignPalette.Status.waitingForApproval)
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -1289,11 +1280,11 @@ private struct IslandSessionRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color(red: 0.11, green: 0.08, blue: 0.03))
+                    .fill(IslandDesignPalette.Status.waitingForApproval.opacity(0.07))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.orange.opacity(0.18))
+                    .strokeBorder(IslandDesignPalette.Status.waitingForApproval.opacity(0.18))
             )
 
             HStack(spacing: 8) {
@@ -1341,7 +1332,7 @@ private struct IslandSessionRow: View {
 
                 Text(lang.t("completion.done"))
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color(red: 0.29, green: 0.86, blue: 0.46).opacity(0.96))
+                    .foregroundStyle(IslandDesignPalette.Status.completed.opacity(0.96))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -1483,7 +1474,7 @@ private struct IslandSessionRow: View {
                 .foregroundStyle(.white.opacity(0.35))
         case .inProgress:
             Circle()
-                .fill(Color(red: 0.34, green: 0.61, blue: 0.99))
+                .fill(IslandDesignPalette.Status.running)
                 .frame(width: 6, height: 6)
         case .pending:
             Circle()
@@ -1622,28 +1613,13 @@ private struct IslandSessionRow: View {
     }
 
     private func statusTint(for presence: IslandSessionPresence) -> Color {
-        if session.phase == .waitingForApproval {
-            return .orange.opacity(0.94)
-        }
-
-        if session.phase == .waitingForAnswer {
-            return .yellow.opacity(0.96)
-        }
-
-        switch presence {
-        case .running:
-            return Color(red: 0.34, green: 0.61, blue: 0.99)
-        case .active:
-            return Color(red: 0.29, green: 0.86, blue: 0.46)
-        case .inactive:
-            return .white.opacity(0.38)
-        }
+        IslandDesignPalette.Status.tint(for: session.phase, presence: presence)
     }
 
     private func activityColor(for presence: IslandSessionPresence) -> Color {
         switch session.spotlightActivityTone {
         case .attention:
-            .orange.opacity(0.94)
+            IslandDesignPalette.Status.tint(for: session.phase)
         case .live:
             statusTint(for: presence)
         case .idle:
@@ -1667,7 +1643,7 @@ private struct StructuredQuestionPromptView: View {
             if showsPromptTitle {
                 Text(promptTitle)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.yellow.opacity(0.96))
+                    .foregroundStyle(IslandDesignPalette.Status.waitingForAnswer)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -1735,7 +1711,7 @@ private struct StructuredQuestionPromptView: View {
                 HStack(spacing: 8) {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(isSelected ? .yellow : .white.opacity(0.35))
+                        .foregroundStyle(isSelected ? IslandDesignPalette.Status.waitingForAnswer : .white.opacity(0.35))
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(option.label)
@@ -1766,11 +1742,11 @@ private struct StructuredQuestionPromptView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isSelected ? Color.yellow.opacity(0.10) : Color.white.opacity(0.04))
+                .fill(isSelected ? IslandDesignPalette.Status.waitingForAnswer.opacity(0.10) : Color.white.opacity(0.04))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(isSelected ? .yellow.opacity(0.25) : .clear)
+                .strokeBorder(isSelected ? IslandDesignPalette.Status.waitingForAnswer.opacity(0.25) : .clear)
         )
     }
 

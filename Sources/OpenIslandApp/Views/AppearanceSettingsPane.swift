@@ -925,7 +925,6 @@ private struct SessionListPanelPreview: View {
                 .shadow(color: .black.opacity(0.36), radius: 22, y: 12)
 
             VStack(spacing: 0) {
-                notchStrip
                 panelHead
                 listBody
                 panelFoot
@@ -944,52 +943,43 @@ private struct SessionListPanelPreview: View {
         profile == .notch ? 46 : 16
     }
 
-    private var notchStrip: some View {
+    private var panelHead: some View {
         HStack(spacing: 8) {
             UnifiedBars(mode: .waiting, size: 22)
                 .frame(width: 24, height: 24)
 
-            Spacer(minLength: 0)
-
-            Text("close ⌃")
-                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                .foregroundStyle(V6Palette.paper.opacity(0.45))
-        }
-        .frame(height: 32)
-        .padding(.leading, sideInset)
-        .padding(.trailing, sideInset)
-    }
-
-    private var panelHead: some View {
-        HStack(spacing: 8) {
             Text("SESSIONS")
                 .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                 .tracking(1.4)
                 .foregroundStyle(V6Palette.paper.opacity(0.55))
 
             if waitingCount > 0 {
-                panelChip("\(waitingCount) waiting", tint: .orange)
+                panelChip("\(waitingCount) waiting", tint: IslandDesignPalette.Status.waitingAggregate)
             }
             if runningCount > 0 {
-                panelChip("\(runningCount) running", tint: Color(red: 0.34, green: 0.61, blue: 0.99))
+                panelChip("\(runningCount) running", tint: IslandDesignPalette.Status.running)
             }
 
             Spacer(minLength: 0)
 
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(V6Palette.paper.opacity(0.5))
-                .frame(width: 24, height: 24)
-                .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            previewHeaderButton(systemName: "gearshape.fill")
         }
         .padding(.leading, sideInset)
         .padding(.trailing, sideInset)
-        .padding(.vertical, 10)
-        .overlay(alignment: .top) {
+        .frame(height: 42)
+        .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(.white.opacity(0.05))
                 .frame(height: 1)
         }
+    }
+
+    private func previewHeaderButton(systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.62))
+            .frame(width: 22, height: 22)
+            .background(.white.opacity(0.08), in: Circle())
     }
 
     private func panelChip(_ text: String, tint: Color) -> some View {
@@ -1288,15 +1278,15 @@ private extension AppearanceSessionPreviewItem.Phase {
     var tint: Color {
         switch self {
         case .approval:
-            Color(red: 0.96, green: 0.44, blue: 0.39)
+            IslandDesignPalette.Status.waitingForApproval
         case .answer:
-            .yellow.opacity(0.96)
+            IslandDesignPalette.Status.waitingForAnswer
         case .running:
-            Color(red: 0.34, green: 0.61, blue: 0.99)
+            IslandDesignPalette.Status.running
         case .done:
-            Color(red: 0.29, green: 0.86, blue: 0.46)
+            IslandDesignPalette.Status.completed
         case .idle:
-            V6Palette.paper.opacity(0.35)
+            IslandDesignPalette.Status.idle
         }
     }
 }
