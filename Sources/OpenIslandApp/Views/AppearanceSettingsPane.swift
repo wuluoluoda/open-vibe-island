@@ -12,13 +12,19 @@ import OpenIslandCore
 struct AppearanceSettingsPane: View {
     var model: AppModel
     @State private var previewMode: UnifiedBars.Mode = .idle
-    @State private var previewLayout: V6ClosedLayout = .external
     @State private var previewAutoCycle: Bool = true
 
     private static let autoCycleOrder: [UnifiedBars.Mode] = [.idle, .running, .waiting]
     private static let autoCycleInterval: TimeInterval = 2.0
 
     private var lang: LanguageManager { model.lang }
+    private var editingProfile: IslandAppearanceDisplayProfile { model.appearanceSettingsProfile }
+    private var editingPreferences: IslandAppearancePreferences {
+        model.appearancePreferences(for: editingProfile)
+    }
+    private var previewLayout: V6ClosedLayout {
+        editingProfile == .notch ? .macbook : .external
+    }
 
     var body: some View {
         ScrollView {
@@ -125,10 +131,12 @@ struct AppearanceSettingsPane: View {
 
     private var previewControls: some View {
         HStack(spacing: 10) {
-            // Layout toggle
-            Picker("", selection: $previewLayout) {
-                Text(lang.t("settings.appearance.preview.external")).tag(V6ClosedLayout.external)
-                Text(lang.t("settings.appearance.preview.macbook")).tag(V6ClosedLayout.macbook)
+            Picker("", selection: Binding(
+                get: { model.appearanceSettingsProfile },
+                set: { model.appearanceSettingsProfile = $0 }
+            )) {
+                Text(lang.t("settings.appearance.preview.external")).tag(IslandAppearanceDisplayProfile.topBar)
+                Text(lang.t("settings.appearance.preview.macbook")).tag(IslandAppearanceDisplayProfile.notch)
             }
             .labelsHidden()
             .pickerStyle(.segmented)
@@ -168,8 +176,9 @@ struct AppearanceSettingsPane: View {
 
         SessionListPanelPreview(
             sections: previewSessionSections,
-            showsSections: model.islandSessionGroup != .none,
-            indicator: model.islandSessionStateIndicator
+            showsSections: editingPreferences.sessionGroup != .none,
+            indicator: editingPreferences.sessionStateIndicator,
+            profile: editingProfile
         )
         .padding(.top, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -218,9 +227,9 @@ struct AppearanceSettingsPane: View {
         @ViewBuilder icon: () -> Content,
         title: String
     ) -> some View {
-        let selected = model.islandRightSlot == option
+        let selected = editingPreferences.rightSlot == option
         return Button {
-            model.islandRightSlot = option
+            model.updateAppearancePreferences(for: editingProfile) { $0.rightSlot = option }
         } label: {
             VStack(spacing: 10) {
                 ZStack {
@@ -268,14 +277,14 @@ struct AppearanceSettingsPane: View {
     }
 
     private func centerLabelCard(_ option: IslandCenterLabel, sample: String) -> some View {
-        let selected = model.islandCenterLabel == option
+        let selected = editingPreferences.centerLabel == option
         let title: String = switch option {
         case .agentAction: lang.t("settings.appearance.centerLabel.agentAction")
         case .sessionName: lang.t("settings.appearance.centerLabel.sessionName")
         case .off:         lang.t("settings.appearance.centerLabel.off")
         }
         return Button {
-            model.islandCenterLabel = option
+            model.updateAppearancePreferences(for: editingProfile) { $0.centerLabel = option }
         } label: {
             VStack(spacing: 10) {
                 ZStack {
@@ -330,10 +339,10 @@ struct AppearanceSettingsPane: View {
 
     private func stateIndicatorCard(_ option: IslandSessionStateIndicator) -> some View {
         optionCard(
-            selected: model.islandSessionStateIndicator == option,
+            selected: editingPreferences.sessionStateIndicator == option,
             title: title(for: option)
         ) {
-            model.islandSessionStateIndicator = option
+            model.updateAppearancePreferences(for: editingProfile) { $0.sessionStateIndicator = option }
         } icon: {
             StateIndicatorPreview(option: option)
         }
@@ -351,10 +360,10 @@ struct AppearanceSettingsPane: View {
         HStack(spacing: 12) {
             ForEach(IslandSessionGroup.allCases) { option in
                 optionCard(
-                    selected: model.islandSessionGroup == option,
+                    selected: editingPreferences.sessionGroup == option,
                     title: title(for: option)
                 ) {
-                    model.islandSessionGroup = option
+                    model.updateAppearancePreferences(for: editingProfile) { $0.sessionGroup = option }
                 } icon: {
                     SessionGroupPreview(option: option)
                 }
@@ -374,10 +383,10 @@ struct AppearanceSettingsPane: View {
         HStack(spacing: 12) {
             ForEach(IslandSessionSort.allCases) { option in
                 optionCard(
-                    selected: model.islandSessionSort == option,
+                    selected: editingPreferences.sessionSort == option,
                     title: title(for: option)
                 ) {
-                    model.islandSessionSort = option
+                    model.updateAppearancePreferences(for: editingProfile) { $0.sessionSort = option }
                 } icon: {
                     SessionSortPreview(option: option)
                 }
@@ -397,10 +406,10 @@ struct AppearanceSettingsPane: View {
         HStack(spacing: 12) {
             ForEach(IslandCompletedStaleThreshold.allCases) { option in
                 optionCard(
-                    selected: model.completedStaleThreshold == option,
+                    selected: editingPreferences.completedStaleThreshold == option,
                     title: title(for: option)
                 ) {
-                    model.completedStaleThreshold = option
+                    model.updateAppearancePreferences(for: editingProfile) { $0.completedStaleThreshold = option }
                 } icon: {
                     Text(title(for: option))
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
@@ -545,8 +554,8 @@ struct AppearanceSettingsPane: View {
 
     private var previewLabel: String? {
         guard previewLayout == .external,
-              model.islandCenterLabel != .off else { return nil }
-        switch (previewMode, model.islandCenterLabel) {
+              editingPreferences.centerLabel != .off else { return nil }
+        switch (previewMode, editingPreferences.centerLabel) {
         case (.idle, _):               return nil
         case (.waiting, _):            return "Permission needed"
         case (.running, .agentAction): return "Claude · editing"
@@ -556,7 +565,7 @@ struct AppearanceSettingsPane: View {
     }
 
     private var previewRightContent: IslandRightSlotContent? {
-        switch model.islandRightSlot {
+        switch editingPreferences.rightSlot {
         case .none: return nil
         case .count: return .count(3)
         case .agents:
@@ -567,7 +576,7 @@ struct AppearanceSettingsPane: View {
     private var previewSessionSections: [AppearanceSessionPreviewSection] {
         let items = sortedPreviewSessionItems
 
-        switch model.islandSessionGroup {
+        switch editingPreferences.sessionGroup {
         case .none:
             return [
                 AppearanceSessionPreviewSection(
@@ -607,7 +616,7 @@ struct AppearanceSettingsPane: View {
     }
 
     private var sortedPreviewSessionItems: [AppearanceSessionPreviewItem] {
-        switch model.islandSessionSort {
+        switch editingPreferences.sessionSort {
         case .attention:
             return previewSessionItems.sorted { lhs, rhs in
                 if lhs.attentionRank == rhs.attentionRank {
@@ -681,7 +690,7 @@ struct AppearanceSettingsPane: View {
                 branch: "main",
                 prompt: "You: summarize the design bundle",
                 terminal: "WezTerm",
-                age: title(for: model.completedStaleThreshold),
+                age: title(for: editingPreferences.completedStaleThreshold),
                 phase: .done,
                 attentionRank: 3,
                 updatedRank: 1
@@ -743,6 +752,7 @@ private struct SessionListPanelPreview: View {
     let sections: [AppearanceSessionPreviewSection]
     let showsSections: Bool
     let indicator: IslandSessionStateIndicator
+    let profile: IslandAppearanceDisplayProfile
 
     private var items: [AppearanceSessionPreviewItem] {
         sections.flatMap(\.items)
@@ -758,7 +768,7 @@ private struct SessionListPanelPreview: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            OpenedIslandSurfaceShape(topProfile: .topBar)
+            surfaceShape
                 .fill(V6Palette.ink)
                 .shadow(color: .black.opacity(0.36), radius: 22, y: 12)
 
@@ -768,11 +778,19 @@ private struct SessionListPanelPreview: View {
                 listBody
                 panelFoot
             }
-            .clipShape(OpenedIslandSurfaceShape(topProfile: .topBar))
+            .clipShape(surfaceShape)
         }
         .frame(width: 560)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var surfaceShape: OpenedIslandSurfaceShape {
+        OpenedIslandSurfaceShape(topProfile: profile == .notch ? .notch : .topBar)
+    }
+
+    private var sideInset: CGFloat {
+        profile == .notch ? 30 : 16
     }
 
     private var notchStrip: some View {
@@ -812,7 +830,7 @@ private struct SessionListPanelPreview: View {
                 .frame(width: 24, height: 24)
                 .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
-        .padding(.leading, 16)
+        .padding(.leading, sideInset)
         .padding(.trailing, 12)
         .padding(.vertical, 10)
         .overlay(alignment: .top) {
@@ -847,7 +865,8 @@ private struct SessionListPanelPreview: View {
                 ForEach(section.items) { item in
                     SessionListLivePreviewRow(
                         item: item,
-                        indicator: indicator
+                        indicator: indicator,
+                        sideInset: sideInset
                     )
                 }
             }
@@ -866,7 +885,8 @@ private struct SessionListPanelPreview: View {
                 .foregroundStyle(V6Palette.paper.opacity(0.4))
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, sideInset)
+        .padding(.trailing, 16)
         .padding(.top, 9)
         .padding(.bottom, 6)
         .overlay(alignment: .top) {
@@ -892,7 +912,8 @@ private struct SessionListPanelPreview: View {
         }
         .font(.system(size: 10.5, weight: .medium, design: .monospaced))
         .foregroundStyle(V6Palette.paper.opacity(0.42))
-        .padding(.horizontal, 16)
+        .padding(.leading, sideInset)
+        .padding(.trailing, 16)
         .padding(.top, 9)
         .padding(.bottom, 14)
         .overlay(alignment: .top) {
@@ -906,6 +927,7 @@ private struct SessionListPanelPreview: View {
 private struct SessionListLivePreviewRow: View {
     let item: AppearanceSessionPreviewItem
     let indicator: IslandSessionStateIndicator
+    let sideInset: CGFloat
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1095,17 +1117,17 @@ private struct SessionListLivePreviewRow: View {
 
     private var rowLeadingPadding: CGFloat {
         switch indicator {
-        case .bar: 28
-        case .tint: 16
-        case .animatedDot, .glyph: 16
+        case .bar: max(28, sideInset)
+        case .tint: sideInset
+        case .animatedDot, .glyph: sideInset
         }
     }
 
     private var detailLeadingPadding: CGFloat {
         switch indicator {
-        case .bar: 28
-        case .tint: 16
-        case .animatedDot, .glyph: 46
+        case .bar: max(28, sideInset)
+        case .tint: sideInset
+        case .animatedDot, .glyph: sideInset + 30
         }
     }
 }

@@ -46,6 +46,22 @@ enum IslandCenterLabel: String, CaseIterable, Identifiable, Sendable {
 
 // MARK: - v8 island preferences
 
+enum IslandAppearanceDisplayProfile: String, CaseIterable, Identifiable, Sendable {
+    case notch
+    case topBar
+
+    var id: String { rawValue }
+}
+
+struct IslandAppearancePreferences: Equatable, Sendable {
+    var rightSlot: IslandRightSlot = .count
+    var centerLabel: IslandCenterLabel = .agentAction
+    var sessionStateIndicator: IslandSessionStateIndicator = .animatedDot
+    var sessionGroup: IslandSessionGroup = .none
+    var sessionSort: IslandSessionSort = .attention
+    var completedStaleThreshold: IslandCompletedStaleThreshold = .fiveMinutes
+}
+
 enum IslandSessionStateIndicator: String, CaseIterable, Identifiable, Sendable {
     case animatedDot
     case bar

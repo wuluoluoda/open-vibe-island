@@ -12,6 +12,18 @@ struct AppModelSessionListTests {
             "appearance.island.v8.sessionGroup",
             "appearance.island.v8.sessionSort",
             "appearance.island.v8.completedStaleThreshold",
+            "appearance.island.v8.notch.rightSlot",
+            "appearance.island.v8.notch.centerLabel",
+            "appearance.island.v8.notch.stateIndicator",
+            "appearance.island.v8.notch.sessionGroup",
+            "appearance.island.v8.notch.sessionSort",
+            "appearance.island.v8.notch.completedStaleThreshold",
+            "appearance.island.v8.topBar.rightSlot",
+            "appearance.island.v8.topBar.centerLabel",
+            "appearance.island.v8.topBar.stateIndicator",
+            "appearance.island.v8.topBar.sessionGroup",
+            "appearance.island.v8.topBar.sessionSort",
+            "appearance.island.v8.topBar.completedStaleThreshold",
         ].forEach(UserDefaults.standard.removeObject(forKey:))
     }
 
@@ -284,6 +296,39 @@ struct AppModelSessionListTests {
         model.state = SessionState(sessions: [olderRunning, newerCompleted])
 
         #expect(model.islandListSessions.map(\.id) == ["newer-completed", "older-running"])
+    }
+
+    @Test
+    func islandAppearancePreferencesPersistPerDisplayProfile() {
+        let model = AppModel()
+        model.updateAppearancePreferences(for: .notch) {
+            $0.sessionGroup = .state
+            $0.sessionStateIndicator = .bar
+            $0.completedStaleThreshold = .twoMinutes
+        }
+        model.updateAppearancePreferences(for: .topBar) {
+            $0.sessionGroup = .project
+            $0.sessionStateIndicator = .tint
+            $0.completedStaleThreshold = .twentyMinutes
+        }
+
+        model.overlayPlacementDiagnostics = placementDiagnostics(mode: .notch)
+        #expect(model.islandSessionGroup == .state)
+        #expect(model.islandSessionStateIndicator == .bar)
+        #expect(model.completedStaleThreshold == .twoMinutes)
+
+        model.overlayPlacementDiagnostics = placementDiagnostics(mode: .topBar)
+        #expect(model.islandSessionGroup == .project)
+        #expect(model.islandSessionStateIndicator == .tint)
+        #expect(model.completedStaleThreshold == .twentyMinutes)
+
+        let reloaded = AppModel()
+        reloaded.overlayPlacementDiagnostics = placementDiagnostics(mode: .notch)
+        #expect(reloaded.islandSessionGroup == .state)
+        #expect(reloaded.islandSessionStateIndicator == .bar)
+        reloaded.overlayPlacementDiagnostics = placementDiagnostics(mode: .topBar)
+        #expect(reloaded.islandSessionGroup == .project)
+        #expect(reloaded.islandSessionStateIndicator == .tint)
     }
 
     @Test
@@ -988,6 +1033,19 @@ struct AppModelSessionListTests {
                 workingDirectory: "/tmp/\(id)",
                 terminalSessionID: "ghostty-\(id)"
             )
+        )
+    }
+
+    private func placementDiagnostics(mode: OverlayPlacementMode) -> OverlayPlacementDiagnostics {
+        OverlayPlacementDiagnostics(
+            targetScreenID: mode == .notch ? "display-notch" : "display-topbar",
+            targetScreenName: mode == .notch ? "Built-in Display" : "External Display",
+            selectionSummary: "test",
+            mode: mode,
+            screenFrame: NSRect(x: 0, y: 0, width: 1512, height: 982),
+            visibleFrame: NSRect(x: 0, y: 0, width: 1512, height: 944),
+            safeAreaInsets: NSEdgeInsets(top: mode == .notch ? 37 : 0, left: 0, bottom: 0, right: 0),
+            overlayFrame: NSRect(x: 400, y: 820, width: 700, height: 160)
         )
     }
 }
