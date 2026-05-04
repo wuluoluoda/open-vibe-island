@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import OpenIslandCore
 
 enum NotchStatus: Equatable {
     case closed
@@ -41,4 +42,55 @@ enum IslandCenterLabel: String, CaseIterable, Identifiable, Sendable {
     case off
 
     var id: String { rawValue }
+}
+
+// MARK: - v8 island preferences
+
+enum IslandSessionStateIndicator: String, CaseIterable, Identifiable, Sendable {
+    case animatedDot
+    case bar
+    case glyph
+    case tint
+
+    var id: String { rawValue }
+}
+
+enum IslandSessionGroup: String, CaseIterable, Identifiable, Sendable {
+    case none
+    case state
+    case agent
+    case project
+
+    var id: String { rawValue }
+}
+
+enum IslandSessionSort: String, CaseIterable, Identifiable, Sendable {
+    case attention
+    case lastUpdate
+
+    var id: String { rawValue }
+}
+
+enum IslandCompletedStaleThreshold: String, CaseIterable, Identifiable, Sendable {
+    case twoMinutes
+    case fiveMinutes
+    case tenMinutes
+    case twentyMinutes
+
+    var id: String { rawValue }
+
+    var seconds: TimeInterval {
+        switch self {
+        case .twoMinutes:    return 2 * 60
+        case .fiveMinutes:   return 5 * 60
+        case .tenMinutes:    return 10 * 60
+        case .twentyMinutes: return 20 * 60
+        }
+    }
+}
+
+struct IslandSessionSection: Identifiable {
+    let id: String
+    let title: String
+    let sessions: [AgentSession]
 }

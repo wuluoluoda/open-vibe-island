@@ -23,6 +23,10 @@ final class AppModel {
     private static let showCodexUsageDefaultsKey = "app.showCodexUsage"
     private static let completionReplyEnabledDefaultsKey = "feature.completionReply.enabled"
     private static let suppressFrontmostNotificationsDefaultsKey = "app.suppressFrontmostNotifications"
+    private static let islandSessionStateIndicatorDefaultsKey = "appearance.island.v8.stateIndicator"
+    private static let islandSessionGroupDefaultsKey = "appearance.island.v8.sessionGroup"
+    private static let islandSessionSortDefaultsKey = "appearance.island.v8.sessionSort"
+    private static let completedStaleThresholdDefaultsKey = "appearance.island.v8.completedStaleThreshold"
 
     private static let syntheticClaudeSessionPrefix = "claude-process:"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
@@ -327,6 +331,39 @@ final class AppModel {
         }
     }
 
+    var islandSessionStateIndicator: IslandSessionStateIndicator = .animatedDot {
+        didSet {
+            guard islandSessionStateIndicator != oldValue else { return }
+            UserDefaults.standard.set(islandSessionStateIndicator.rawValue, forKey: Self.islandSessionStateIndicatorDefaultsKey)
+            refreshOverlayPlacementIfVisible()
+        }
+    }
+
+    var islandSessionGroup: IslandSessionGroup = .none {
+        didSet {
+            guard islandSessionGroup != oldValue else { return }
+            UserDefaults.standard.set(islandSessionGroup.rawValue, forKey: Self.islandSessionGroupDefaultsKey)
+            refreshOverlayPlacementIfVisible()
+        }
+    }
+
+    var islandSessionSort: IslandSessionSort = .attention {
+        didSet {
+            guard islandSessionSort != oldValue else { return }
+            UserDefaults.standard.set(islandSessionSort.rawValue, forKey: Self.islandSessionSortDefaultsKey)
+            refreshOverlayPlacementIfVisible()
+        }
+    }
+
+    var completedStaleThreshold: IslandCompletedStaleThreshold = .fiveMinutes {
+        didSet {
+            guard completedStaleThreshold != oldValue else { return }
+            UserDefaults.standard.set(completedStaleThreshold.rawValue, forKey: Self.completedStaleThresholdDefaultsKey)
+            _cachedSessionBuckets = nil
+            refreshOverlayPlacementIfVisible()
+        }
+    }
+
     @ObservationIgnored
     var openSettingsWindow: (() -> Void)?
 
@@ -473,6 +510,18 @@ final class AppModel {
         islandCenterLabel = IslandCenterLabel(
             rawValue: UserDefaults.standard.string(forKey: Self.islandCenterLabelDefaultsKey) ?? ""
         ) ?? .agentAction
+        islandSessionStateIndicator = IslandSessionStateIndicator(
+            rawValue: UserDefaults.standard.string(forKey: Self.islandSessionStateIndicatorDefaultsKey) ?? ""
+        ) ?? .animatedDot
+        islandSessionGroup = IslandSessionGroup(
+            rawValue: UserDefaults.standard.string(forKey: Self.islandSessionGroupDefaultsKey) ?? ""
+        ) ?? .none
+        islandSessionSort = IslandSessionSort(
+            rawValue: UserDefaults.standard.string(forKey: Self.islandSessionSortDefaultsKey) ?? ""
+        ) ?? .attention
+        completedStaleThreshold = IslandCompletedStaleThreshold(
+            rawValue: UserDefaults.standard.string(forKey: Self.completedStaleThresholdDefaultsKey) ?? ""
+        ) ?? .fiveMinutes
         watchNotificationEnabled = UserDefaults.standard.bool(forKey: Self.watchNotificationEnabledKey)
         if watchNotificationEnabled {
             startWatchRelay()
@@ -583,7 +632,38 @@ final class AppModel {
     }
 
     var islandListSessions: [AgentSession] {
-        surfacedSessions
+        islandSessionSections.flatMap(\.sessions)
+    }
+
+    var islandSessionSections: [IslandSessionSection] {
+        let sessions = sortIslandSessions(surfacedSessions)
+        switch islandSessionGroup {
+        case .none:
+            return [
+                IslandSessionSection(
+                    id: "all",
+                    title: "Sessions",
+                    sessions: sessions
+                )
+            ]
+        case .state:
+            return stateGroupedSections(for: sessions)
+        case .agent:
+            return AgentTool.allCases.compactMap { tool in
+                let list = sessions.filter { $0.tool == tool }
+                guard !list.isEmpty else { return nil }
+                return IslandSessionSection(id: "agent-\(tool.rawValue)", title: tool.displayName, sessions: list)
+            }
+        case .project:
+            let names = Set(sessions.map(projectGroupName(for:))).sorted {
+                $0.localizedStandardCompare($1) == .orderedAscending
+            }
+            return names.compactMap { name in
+                let list = sessions.filter { projectGroupName(for: $0) == name }
+                guard !list.isEmpty else { return nil }
+                return IslandSessionSection(id: "project-\(name)", title: name, sessions: list)
+            }
+        }
     }
 
     var recentSessionCount: Int {
@@ -600,6 +680,57 @@ final class AppModel {
 
     var liveRunningCount: Int {
         surfacedSessions.filter { $0.phase == .running }.count
+    }
+
+    private func sortIslandSessions(_ sessions: [AgentSession]) -> [AgentSession] {
+        switch islandSessionSort {
+        case .attention:
+            return sessions
+        case .lastUpdate:
+            return sessions.sorted { lhs, rhs in
+                if lhs.islandActivityDate == rhs.islandActivityDate {
+                    return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+                }
+                return lhs.islandActivityDate > rhs.islandActivityDate
+            }
+        }
+    }
+
+    private func stateGroupedSections(for sessions: [AgentSession]) -> [IslandSessionSection] {
+        let definitions: [(id: String, title: String, include: (AgentSession) -> Bool)] = [
+            ("approval", "Needs approval", { $0.phase == .waitingForApproval }),
+            ("answer", "Needs answer", { $0.phase == .waitingForAnswer }),
+            ("running", "In progress", { $0.phase == .running }),
+            ("done", "Just done", { [completedStaleThreshold] session in
+                session.phase == .completed
+                    && !session.isStaleCompletedForIsland(at: .now, threshold: completedStaleThreshold.seconds)
+            }),
+            ("idle", "Idle", { [completedStaleThreshold] session in
+                session.phase == .completed
+                    && session.isStaleCompletedForIsland(at: .now, threshold: completedStaleThreshold.seconds)
+            }),
+        ]
+
+        return definitions.compactMap { definition in
+            let list = sessions.filter(definition.include)
+            guard !list.isEmpty else { return nil }
+            return IslandSessionSection(id: "state-\(definition.id)", title: definition.title, sessions: list)
+        }
+    }
+
+    private func projectGroupName(for session: AgentSession) -> String {
+        if let workspace = session.jumpTarget?.workspaceName.trimmingCharacters(in: .whitespacesAndNewlines),
+           !workspace.isEmpty {
+            return workspace
+        }
+
+        let title = session.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return session.tool.displayName }
+
+        let pieces = title.split(separator: "·", maxSplits: 1).map {
+            String($0).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return pieces.last?.isEmpty == false ? pieces.last! : title
     }
 
     // MARK: - v6 closed-island derivation
@@ -1488,7 +1619,7 @@ final class AppModel {
             score += 600
         }
 
-        if session.isStaleCompletedForIsland(at: now) {
+        if session.isStaleCompletedForIsland(at: now, threshold: completedStaleThreshold.seconds) {
             score -= 900
         }
 

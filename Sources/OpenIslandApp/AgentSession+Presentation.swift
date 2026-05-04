@@ -294,9 +294,12 @@ extension AgentSession {
 
     /// v8 UI-only staleness: keep `SessionPhase.completed` unchanged, but
     /// visually fold older completed rows into the low-priority presentation.
-    func isStaleCompletedForIsland(at referenceDate: Date) -> Bool {
+    func isStaleCompletedForIsland(
+        at referenceDate: Date,
+        threshold: TimeInterval = Self.staleCompletedDisplayThreshold
+    ) -> Bool {
         phase == .completed
-            && referenceDate.timeIntervalSince(islandActivityDate) >= Self.staleCompletedDisplayThreshold
+            && referenceDate.timeIntervalSince(islandActivityDate) >= threshold
     }
 
     private var spotlightRunningActivityText: String? {
