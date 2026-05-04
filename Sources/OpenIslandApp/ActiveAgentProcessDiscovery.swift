@@ -405,13 +405,9 @@ struct ActiveAgentProcessDiscovery {
             return "Zellij"
         }
 
-        // VS Code family
-        if lowered.contains("/visual studio code.app/") || lowered.contains("/code helper") {
-            return "VS Code"
-        }
-        if lowered.contains("/visual studio code - insiders.app/") {
-            return "VS Code Insiders"
-        }
+        // VS Code family — check forks BEFORE plain VS Code so fork apps that
+        // retain the upstream "Code Helper" naming inside their Electron
+        // framework aren't misidentified as VS Code (#415).
         if lowered.contains("/cursor.app/") {
             return "Cursor"
         }
@@ -420,6 +416,18 @@ struct ActiveAgentProcessDiscovery {
         }
         if lowered.contains("/trae.app/") {
             return "Trae"
+        }
+        if lowered.contains("/qoder.app/") {
+            return "Qoder"
+        }
+        if lowered.contains("/codebuddy.app/") {
+            return "CodeBuddy"
+        }
+        if lowered.contains("/visual studio code - insiders.app/") {
+            return "VS Code Insiders"
+        }
+        if lowered.contains("/visual studio code.app/") {
+            return "VS Code"
         }
 
         // JetBrains IDEs

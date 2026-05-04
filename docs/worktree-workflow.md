@@ -1,6 +1,6 @@
 # Worktree Workflow
 
-This repository should use Git worktrees as the default shape for parallel development.
+This repository should use Git worktrees as the default shape for development.
 
 ## Goals
 
@@ -15,12 +15,13 @@ This repository should use Git worktrees as the default shape for parallel devel
 
 - Path: `/Users/wangruobing/Personal/open-island`
 - Branch: `main`
-- Purpose: fetch, integrate, verify, and push
+- Purpose: fetch, mirror `main` after PR merges, and verify
 
 Rules:
 
-- Do not start new feature work here when parallel work is active.
-- Only use this worktree to inspect the overall state, run final integration checks, resolve conflicts, and push `main`.
+- Do not start feature work here.
+- Do not edit, commit, or push directly on `main`.
+- Only use this worktree to inspect the overall state, fetch, update local `main` with `git pull --ff-only`, and run final verification after PRs merge.
 
 ### 2. Topic worktrees
 
@@ -81,7 +82,7 @@ If rebase is risky for that slice, merge `origin/main` into the topic branch exp
 
 First make sure the topic worktree is committed and verified.
 
-Then return to the integration worktree:
+Push the feature branch and open a PR targeting `main`. After the PR merges, return to the integration worktree:
 
 ```bash
 git switch main
@@ -89,28 +90,10 @@ git fetch origin
 git pull --ff-only origin main
 ```
 
-Preferred path for clean history:
-
-1. rebase the topic branch onto the latest `origin/main`
-2. merge it into local `main` with fast-forward when possible
-
-Example:
-
-```bash
-git switch feat/island-polish
-git fetch origin
-git rebase origin/main
-
-git switch main
-git merge --ff-only feat/island-polish
-```
-
-If only part of a topic branch is ready, use `git cherry-pick` from the integration worktree instead of merging the whole branch.
-
 ## Push policy
 
 - Push topic branches when you want backup, review, or collaboration.
-- Push `main` only after the integration worktree has absorbed the intended branch set and passed the relevant verification.
+- Do not push `main` directly. Merge through PRs, then update the integration worktree with `git pull --ff-only`.
 
 ## Cleanup
 
@@ -135,7 +118,7 @@ git push origin --delete <branch-name>
 - If a worktree becomes exploratory rather than shippable, rename the branch into `investigate/<topic>` or close it.
 - When assigning work to multiple agents, split by file ownership or subsystem, not by vague goal.
 
-## Suggested Parallel Layout
+## Suggested Workstream Layout
 
 Good parallel split:
 
@@ -143,8 +126,8 @@ Good parallel split:
 - `fix/codex-hook-installer`: `Sources/OpenIslandCore/CodexHookInstaller.swift`
 - `investigate/jump-accuracy`: terminal jump diagnostics and docs
 
-Bad parallel split:
+Bad split:
 
 - two agents both editing `AppModel.swift`
 - one branch mixing hook installer work, island UI changes, and docs cleanup
-- direct feature edits on the shared `main` worktree while another topic branch is still integrating
+- direct feature edits on the shared `main` worktree

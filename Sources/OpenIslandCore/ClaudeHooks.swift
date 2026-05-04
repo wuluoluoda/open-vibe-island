@@ -8,6 +8,7 @@ public enum ClaudePermissionMode: String, Codable, Sendable {
     case plan
     case dontAsk
     case bypassPermissions
+    case auto
 }
 
 public enum ClaudePermissionBehavior: String, Codable, Sendable {
@@ -163,6 +164,8 @@ public enum ClaudePermissionUpdate: Equatable, Codable, Sendable {
                 return "Plan Mode"
             case .default:
                 return "Manual Mode"
+            case .auto:
+                return "Auto Mode"
             }
         case .replaceRules:
             return "Update Rules"
@@ -837,10 +840,16 @@ public extension ClaudeHookPayload {
                 return nil
             }
 
+            // CLIs add "Other" client-side and tell the model not to include one; mirror that here.
+            var resolvedOptions = options
+            resolvedOptions.append(
+                QuestionOption(label: "Other", description: "", allowsFreeform: true)
+            )
+
             return QuestionPromptItem(
                 question: questionText,
                 header: header,
-                options: options,
+                options: resolvedOptions,
                 multiSelect: questionObject["multiSelect"]?.boolValue ?? false
             )
         }

@@ -100,6 +100,7 @@ struct IslandPanelView: View {
     var model: AppModel
 
     @State private var isHovering = false
+    @State private var showingQuitConfirmation = false
 
     private var isOpened: Bool {
         model.notchStatus == .opened
@@ -148,7 +149,7 @@ struct IslandPanelView: View {
     }
 
     private var openedHeaderButtonsWidth: CGFloat {
-        (Self.headerControlButtonSize * 2) + Self.headerControlSpacing
+        (Self.headerControlButtonSize * 3) + (Self.headerControlSpacing * 2)
     }
 
     var body: some View {
@@ -163,6 +164,14 @@ struct IslandPanelView: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+        .alert(model.lang.t("island.quit.confirmTitle"), isPresented: $showingQuitConfirmation) {
+            Button(model.lang.t("island.quit.confirmAction"), role: .destructive) {
+                model.quitApplication()
+            }
+            Button(model.lang.t("settings.general.cancel"), role: .cancel) {}
+        } message: {
+            Text(model.lang.t("island.quit.confirmMessage"))
+        }
     }
 
     @ViewBuilder
@@ -273,7 +282,7 @@ struct IslandPanelView: View {
     // MARK: - Closed state
 
     private var closedNotchWidth: CGFloat {
-        (targetOverlayScreen ?? NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }))?.notchSize.width ?? 224
+        (targetOverlayScreen ?? NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }))?.notchSize.width ?? NSScreen.externalDisplayNotchWidth
     }
 
     private var closedNotchHeight: CGFloat {
@@ -329,12 +338,21 @@ struct IslandPanelView: View {
             headerIconButton(systemName: "gearshape.fill", tint: .white.opacity(0.62)) {
                 model.showSettings()
             }
+
+            headerIconButton(
+                systemName: "power",
+                tint: .white.opacity(0.62),
+                accessibilityLabel: model.lang.t("island.quit.confirmTitle")
+            ) {
+                showingQuitConfirmation = true
+            }
         }
     }
 
     private func headerIconButton(
         systemName: String,
         tint: Color,
+        accessibilityLabel: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -345,6 +363,7 @@ struct IslandPanelView: View {
                 .background(.white.opacity(0.08), in: Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel ?? systemName)
     }
 
     private var openedContent: some View {
@@ -1483,6 +1502,7 @@ private struct StructuredQuestionPromptView: View {
     let onAnswer: (QuestionPromptResponse) -> Void
 
     @State private var selections: [String: Set<String>] = [:]
+    @State private var freeformTexts: [String: String] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1546,44 +1566,74 @@ private struct StructuredQuestionPromptView: View {
 
     // MARK: - Option row (vertical, CLI-style)
 
-    /// Renders a single option as a selectable row with checkmark indicator, label, and optional description.
+    @ViewBuilder
     private func optionRow(_ option: QuestionOption, question: QuestionPromptItem) -> some View {
         let isSelected = selectedLabels(for: question).contains(option.label)
-        return Button {
-            toggle(option: option.label, for: question)
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(isSelected ? .yellow : .white.opacity(0.35))
+        let showsFreeform = option.allowsFreeform && isSelected
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                toggle(option: option.label, for: question)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(isSelected ? .yellow : .white.opacity(0.35))
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(option.label)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(isSelected ? 1 : 0.78))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(option.label)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(isSelected ? 1 : 0.78))
 
-                    if !option.description.isEmpty {
-                        Text(option.description)
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.white.opacity(0.4))
-                            .lineLimit(1)
+                        if !option.description.isEmpty {
+                            Text(option.description)
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .lineLimit(1)
+                        }
                     }
-                }
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+                .padding(.vertical, 5)
+                .padding(.horizontal, 10)
             }
-            .padding(.vertical, 5)
-            .padding(.horizontal, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isSelected ? Color.yellow.opacity(0.10) : Color.white.opacity(0.04))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(isSelected ? .yellow.opacity(0.25) : .clear)
-            )
+            .buttonStyle(.plain)
+
+            if showsFreeform {
+                Divider()
+                    .overlay(Color.white.opacity(0.08))
+                freeformField(for: option, question: question)
+            }
         }
-        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isSelected ? Color.yellow.opacity(0.10) : Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(isSelected ? .yellow.opacity(0.25) : .clear)
+        )
+    }
+
+    @ViewBuilder
+    private func freeformField(for option: QuestionOption, question: QuestionPromptItem) -> some View {
+        let key = freeformKey(for: question, option: option)
+        ReplyTextField(
+            placeholder: lang.t("question.otherPlaceholder"),
+            text: Binding(
+                get: { freeformTexts[key] ?? "" },
+                set: { freeformTexts[key] = $0 }
+            ),
+            onSubmit: {
+                if hasCompleteSelection {
+                    onAnswer(QuestionPromptResponse(answers: answerMap))
+                }
+            }
+        )
+        .frame(height: 22)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
     }
 
     // MARK: - Helpers
@@ -1611,20 +1661,58 @@ private struct StructuredQuestionPromptView: View {
 
     private var answerMap: [String: String] {
         Dictionary(uniqueKeysWithValues: structuredQuestions.compactMap { question in
-            let selected = selectedLabels(for: question)
-            guard !selected.isEmpty else {
+            let values = resolvedAnswers(for: question)
+            guard !values.isEmpty else {
                 return nil
             }
-            return (question.question, selected.sorted().joined(separator: ", "))
+            return (question.question, values.joined(separator: ", "))
         })
     }
 
     private var hasCompleteSelection: Bool {
-        structuredQuestions.allSatisfy { !selectedLabels(for: $0).isEmpty }
+        structuredQuestions.allSatisfy { question in
+            let selected = selectedLabels(for: question)
+            guard !selected.isEmpty else {
+                return false
+            }
+            // When a freeform option is selected, require non-empty text.
+            for option in question.options where option.allowsFreeform && selected.contains(option.label) {
+                if trimmedFreeform(for: question, option: option).isEmpty {
+                    return false
+                }
+            }
+            return true
+        }
     }
 
     private func selectedLabels(for question: QuestionPromptItem) -> Set<String> {
         selections[question.question] ?? []
+    }
+
+    private func resolvedAnswers(for question: QuestionPromptItem) -> [String] {
+        let selected = selectedLabels(for: question)
+        guard !selected.isEmpty else { return [] }
+
+        let optionOrder = question.options
+        var answers: [String] = []
+        for option in optionOrder where selected.contains(option.label) {
+            if option.allowsFreeform {
+                let text = trimmedFreeform(for: question, option: option)
+                answers.append(text.isEmpty ? option.label : text)
+            } else {
+                answers.append(option.label)
+            }
+        }
+        return answers
+    }
+
+    private func freeformKey(for question: QuestionPromptItem, option: QuestionOption) -> String {
+        "\(question.question)|\(option.label)"
+    }
+
+    private func trimmedFreeform(for question: QuestionPromptItem, option: QuestionOption) -> String {
+        (freeformTexts[freeformKey(for: question, option: option)] ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func toggle(option: String, for question: QuestionPromptItem) {
@@ -1785,117 +1873,6 @@ private struct IslandWideButtonStyle: ButtonStyle {
 }
 
 // MARK: - Menu bar content (unchanged)
-
-struct MenuBarContentView: View {
-    var model: AppModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(model.lang.t("app.name.oss"))
-                .font(.headline)
-            Text(model.lang.t("menu.status", model.liveSessionCount, model.liveAttentionCount))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Divider()
-
-            Button(model.lang.t("menu.settings")) {
-                model.showSettings()
-            }
-
-            #if DEBUG
-            Button(model.lang.t("menu.openDebug")) {
-                model.showControlCenter()
-            }
-            #endif
-
-            Text(model.acceptanceStatusTitle)
-                .font(.subheadline.weight(.semibold))
-            Text(model.acceptanceStatusSummary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-
-            Button(model.isOverlayVisible ? model.lang.t("menu.hideOverlay") : model.lang.t("menu.showOverlay")) {
-                model.toggleOverlay()
-            }
-
-            Divider()
-
-            Text(model.codexHookStatusTitle)
-                .font(.subheadline.weight(.semibold))
-            Text(model.codexHookStatusSummary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Button(model.lang.t("menu.refreshCodexHooks")) {
-                model.refreshCodexHookStatus()
-            }
-
-            if model.codexHooksInstalled {
-                Button(model.lang.t("menu.uninstallCodexHooks")) {
-                    model.uninstallCodexHooks()
-                }
-            } else {
-                Button(model.lang.t("menu.installCodexHooks")) {
-                    model.installCodexHooks()
-                }
-                .disabled(model.hooksBinaryURL == nil)
-            }
-
-            Divider()
-
-            Text(model.claudeHookStatusTitle)
-                .font(.subheadline.weight(.semibold))
-            Text(model.claudeHookStatusSummary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Button(model.lang.t("menu.refreshClaudeHooks")) {
-                model.refreshClaudeHookStatus()
-            }
-
-            if model.claudeHooksInstalled {
-                Button(model.lang.t("menu.uninstallClaudeHooks")) {
-                    model.uninstallClaudeHooks()
-                }
-            } else {
-                Button(model.lang.t("menu.installClaudeHooks")) {
-                    model.installClaudeHooks()
-                }
-                .disabled(model.hooksBinaryURL == nil)
-            }
-
-            if let session = model.focusedSession {
-                Divider()
-                Text(session.title)
-                    .font(.subheadline.weight(.semibold))
-                Text(session.spotlightPrimaryText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let currentTool = session.spotlightCurrentToolLabel {
-                    Text(model.lang.t("menu.liveTool", currentTool))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let trackingLabel = session.spotlightTrackingLabel {
-                    Text(model.lang.t("menu.tracking", trackingLabel))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(16)
-        .frame(width: 280)
-    }
-}
 
 // MARK: - MarkdownUI Theme
 

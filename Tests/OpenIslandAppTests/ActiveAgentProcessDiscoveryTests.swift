@@ -94,4 +94,47 @@ struct ActiveAgentProcessDiscoveryTests {
             ),
         ])
     }
+
+    /// VS Code forks (Cursor, Windsurf, Trae, Qoder) bundle Electron's "Code
+    /// Helper" inside their .app bundles. Their helper paths therefore contain
+    /// both "/<fork>.app/" and "/code helper", and Open Island used to match
+    /// the broad "/code helper" check first → mis-attributed every fork to
+    /// stock VS Code (#415). Verify each fork is recognized correctly.
+    @Test(arguments: [
+        ("/Applications/Cursor.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper", "Cursor"),
+        ("/Applications/Windsurf.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper", "Windsurf"),
+        ("/Applications/Trae.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper", "Trae"),
+        ("/Applications/Qoder.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper", "Qoder"),
+        ("/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper", "VS Code"),
+    ])
+    func recognizesVSCodeForkBeforeFallingBackToVSCode(parentCommand: String, expectedTerminal: String) {
+        let discovery = ActiveAgentProcessDiscovery { executablePath, arguments in
+            if executablePath == "/bin/ps" {
+                return """
+                  102 301 ttys002 /Users/test/.local/bin/claude
+                  301 900 ttys002 -/opt/homebrew/bin/fish
+                  900 1 ?? \(parentCommand)
+                """
+            }
+            guard executablePath == "/usr/sbin/lsof" else {
+                return nil
+            }
+            return """
+            fcwd
+            n/tmp/open-island
+            """
+        }
+
+        let snapshots = discovery.discover()
+
+        #expect(snapshots == [
+            .init(
+                tool: .claudeCode,
+                sessionID: nil,
+                workingDirectory: "/tmp/open-island",
+                terminalTTY: "/dev/ttys002",
+                terminalApp: expectedTerminal
+            ),
+        ])
+    }
 }

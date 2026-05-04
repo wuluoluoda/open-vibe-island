@@ -117,6 +117,9 @@
 "settings.about.version" = "版本 %@";
 "settings.about.checkForUpdates" = "检查更新…";
 "settings.about.quitApp" = "退出 Open Island";
+"island.quit.confirmTitle" = "退出 Open Island？";
+"island.quit.confirmAction" = "退出";
+"island.quit.confirmMessage" = "确定要退出吗？";
 
 /* Settings - Update */
 "settings.update.available" = "v%@ 可更新 — 点击更新";
@@ -126,7 +129,7 @@
 "island.terminalOwnership" = "Open Island 将在确认终端归属后显示实时代理";
 "island.noTerminals" = "没有打开的终端会话";
 "island.startAgent" = "在终端中启动编码代理";
-"island.recentSessions" = "最近的会话将保留在控制中心，直到终端重新打开";
+"island.recentSessions" = "最近的会话将保留在这里，直到终端重新打开";
 "island.hint.installHooks" = "尚未安装任何 Agent hook，session 不会触发事件 · 点击配置";
 
 /* Island Panel - Session List */
@@ -143,52 +146,11 @@
 /* Island Panel - Question */
 "question.submit" = "提交答案";
 "question.answerNeeded" = "需要回答";
+"question.otherPlaceholder" = "输入你的回答…";
 
 /* Island Panel - Completion */
 "completion.done" = "完成";
 "completion.replyPlaceholder" = "回复 Claude…";
 
-/* Menu Bar */
-"menu.status" = "%lld 活跃 · %lld 待处理";
-"menu.settings" = "设置…";
-"menu.openDebug" = "打开调试面板";
-"menu.hideOverlay" = "隐藏岛屿浮层";
-"menu.showOverlay" = "显示岛屿浮层";
-"menu.refreshCodexHooks" = "刷新 Codex Hook 状态";
-"menu.uninstallCodexHooks" = "卸载 Codex Hooks";
-"menu.installCodexHooks" = "安装 Codex Hooks";
-"menu.refreshClaudeHooks" = "刷新 Claude Hook 状态";
-"menu.uninstallClaudeHooks" = "卸载 Claude Hooks";
-"menu.installClaudeHooks" = "安装 Claude Hooks";
-"menu.liveTool" = "当前工具: %@";
-"menu.tracking" = "跟踪: %@";
-
-/* Debug Panel */
-"debug.title" = "Open Island 调试";
-"debug.description" = "基于 Mock 的 Notch 界面测试工具，用于验证会话列表、审批、问答和完成卡片。";
-"debug.scenarios" = "场景";
-"debug.actions" = "操作";
-"debug.actionsDescription" = "内联预览是隔离的。如果你想让真实的顶部岛屿镜像当前 Mock，请使用下方按钮。";
-"debug.mirrorToIsland" = "镜像到岛屿";
-"debug.closeIsland" = "关闭岛屿";
-"debug.currentMock" = "当前 Mock";
-"debug.liveOverlay" = "实时浮层";
-"debug.inlinePreview" = "内联预览";
-"debug.previewDescription" = "此预览是稳定的，忽略实时 Bridge 活动。";
-"debug.visible" = "可见";
-"debug.surface" = "界面";
-"debug.sessions" = "会话";
-"debug.message" = "消息";
-"debug.yes" = "是";
-"debug.no" = "否";
-"debug.refresh" = "刷新";
-"debug.removeHooks" = "移除 Hooks";
-"debug.installHooks" = "安装 Hooks";
-"debug.removeBridge" = "移除 Bridge";
-"debug.installBridge" = "安装 Bridge";
-"debug.sessionList" = "会话列表";
-"debug.sessionListActionable" = "会话列表 (可操作)";
-
 /* Window Titles */
 "window.settings" = "Open Island 设置";
-"window.debug" = "Open Island 调试";

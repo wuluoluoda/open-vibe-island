@@ -258,6 +258,28 @@ final class AppModel {
             UserDefaults.standard.set(suppressFrontmostNotifications, forKey: Self.suppressFrontmostNotificationsDefaultsKey)
         }
     }
+    var launchAtLoginEnabled: Bool = false {
+        didSet {
+            guard !isApplyingLaunchAtLogin, hasFinishedInit, launchAtLoginEnabled != oldValue else { return }
+            do {
+                try LaunchAtLoginService.shared.setEnabled(launchAtLoginEnabled)
+            } catch {
+                isApplyingLaunchAtLogin = true
+                launchAtLoginEnabled = oldValue
+                isApplyingLaunchAtLogin = false
+                presentLaunchAtLoginError(error)
+            }
+        }
+    }
+    private func presentLaunchAtLoginError(_ error: Error) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = lang.t("settings.general.launchAtLogin")
+        alert.informativeText = error.localizedDescription
+        alert.runModal()
+    }
+    @ObservationIgnored
+    private var isApplyingLaunchAtLogin = false
     var isSoundMuted = false {
         didSet {
             guard isSoundMuted != oldValue else {
@@ -444,6 +466,7 @@ final class AppModel {
             )
         }
         completionReplyEnabled = UserDefaults.standard.bool(forKey: Self.completionReplyEnabledDefaultsKey)
+        launchAtLoginEnabled = LaunchAtLoginService.shared.isEnabled
         islandRightSlot = IslandRightSlot(
             rawValue: UserDefaults.standard.string(forKey: Self.islandRightSlotDefaultsKey) ?? ""
         ) ?? .count
@@ -976,7 +999,16 @@ final class AppModel {
     }
 
     func showSettings() {
-        openSettingsWindow?()
+        if let opener = openSettingsWindow {
+            opener()
+        } else {
+            // First-launch fallback: SwiftUI's `openWindow` closure is registered
+            // by `SettingsWindowContent.onAppear`, which doesn't fire until the
+            // settings window renders the first time. Send the standard
+            // `showSettingsWindow:` responder action (macOS 13+) so it fires
+            // the `CommandGroup(.appSettings)` button that opens the window.
+            NSApp.sendAction(NSSelectorFromString("showSettingsWindow:"), to: nil, from: nil)
+        }
         if let window = NSApp.windows.first(where: { $0.title == "Open Island Settings" }) {
             window.orderFrontRegardless()
             window.makeKey()
@@ -991,25 +1023,6 @@ final class AppModel {
     func showOnboarding() {
         showSettings()
         NotificationCenter.default.post(name: .openIslandSelectSetupTab, object: nil)
-    }
-
-    func showControlCenter() {
-        guard let window = NSApp.windows.first(where: { $0.title == "Open Island Debug" }) else {
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-
-        window.orderFrontRegardless()
-        window.makeKey()
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    func hideControlCenter() {
-        guard let window = NSApp.windows.first(where: { $0.title == "Open Island Debug" }) else {
-            return
-        }
-
-        window.orderOut(nil)
     }
 
     func toggleSoundMuted() {
