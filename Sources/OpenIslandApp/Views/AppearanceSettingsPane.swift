@@ -758,7 +758,7 @@ private struct SessionListPanelPreview: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            NotchShape.opened
+            OpenedIslandSurfaceShape(topProfile: .topBar)
                 .fill(V6Palette.ink)
                 .shadow(color: .black.opacity(0.36), radius: 22, y: 12)
 
@@ -768,9 +768,9 @@ private struct SessionListPanelPreview: View {
                 listBody
                 panelFoot
             }
-            .clipShape(NotchShape.opened)
+            .clipShape(OpenedIslandSurfaceShape(topProfile: .topBar))
         }
-        .frame(width: 520)
+        .frame(width: 560)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .center)
     }

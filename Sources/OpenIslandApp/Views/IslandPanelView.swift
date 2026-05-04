@@ -248,9 +248,8 @@ struct IslandPanelView: View {
         let bottomInset = 14.0
         let surfaceWidth = openedWidth + (horizontalInset * 2)
         let surfaceHeight = openedHeight + bottomInset
-        let surfaceShape = NotchShape(
-            topCornerRadius: NotchShape.openedTopRadius,
-            bottomCornerRadius: NotchShape.openedBottomRadius
+        let surfaceShape = OpenedIslandSurfaceShape(
+            topProfile: usesNotchAwareOpenedHeader ? .notch : .topBar
         )
 
         ZStack(alignment: .top) {
