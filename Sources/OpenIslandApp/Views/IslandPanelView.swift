@@ -1414,8 +1414,7 @@ private struct IslandSessionRow: View {
         let workspace = session.spotlightWorkspaceName.trimmedForNotificationCard
         let title = workspace.isEmpty ? session.tool.displayName : workspace
         guard let branch = session.spotlightWorktreeBranch?.trimmedForNotificationCard,
-              !branch.isEmpty,
-              branch != "main" else {
+              !branch.isEmpty else {
             return title
         }
 
@@ -1935,14 +1934,26 @@ private struct IslandSessionRow: View {
             }
         } label: {
             Image(systemName: "chevron.down")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(isOpen ? .white.opacity(0.62) : .white.opacity(0.36))
-                .frame(width: 18, height: 18)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(isOpen || isHighlighted ? .white.opacity(0.68) : .white.opacity(0.42))
+                .frame(width: 28, height: 28)
+                .background(
+                    Circle()
+                        .fill(.white.opacity(detailToggleFillOpacity(isOpen: isOpen)))
+                )
                 .rotationEffect(.degrees(isOpen ? 180 : 0))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isOpen ? "Collapse session detail" : "Expand session detail")
+    }
+
+    private func detailToggleFillOpacity(isOpen: Bool) -> Double {
+        if isHighlighted {
+            return isOpen ? 0.075 : 0.055
+        }
+
+        return isOpen ? 0.045 : 0.02
     }
 
     private func compactBadge(

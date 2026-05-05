@@ -1090,9 +1090,13 @@ private struct SessionListLivePreviewRow: View {
                         .frame(minWidth: 30, alignment: .trailing)
 
                     Image(systemName: item.phase == .idle ? "chevron.right" : "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(V6Palette.paper.opacity(item.phase == .idle ? 0.36 : 0.72))
-                        .frame(width: 20, height: 20)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(V6Palette.paper.opacity(item.phase == .idle ? 0.42 : 0.68))
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Circle()
+                                .fill(.white.opacity(item.phase == .idle ? 0.02 : 0.045))
+                        )
                 }
             }
             .padding(.horizontal, rowLeadingPadding)

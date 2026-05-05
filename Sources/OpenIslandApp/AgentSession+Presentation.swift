@@ -138,7 +138,17 @@ extension AgentSession {
     }
 
     var spotlightWorktreeBranch: String? {
-        claudeMetadata?.worktreeBranch
+        if let branch = claudeMetadata?.worktreeBranch?.trimmedForSurface,
+           !branch.isEmpty {
+            return branch
+        }
+
+        guard let workingDirectory = jumpTarget?.workingDirectory?.trimmedForSurface,
+              !workingDirectory.isEmpty else {
+            return nil
+        }
+
+        return WorkspaceNameResolver.gitBranch(for: workingDirectory)
     }
 
     var spotlightSubagentLabel: String? {
