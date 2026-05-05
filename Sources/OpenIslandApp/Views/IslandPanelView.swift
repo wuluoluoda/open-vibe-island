@@ -1248,7 +1248,7 @@ private struct IslandSessionRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(session.spotlightHeadlineText)
-                    .font(.system(size: isActionable ? 13.8 : 13.2, weight: .semibold))
+                    .font(summaryTitleFont)
                     .foregroundStyle(titleColor(for: presence))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -1257,7 +1257,7 @@ private struct IslandSessionRow: View {
                    let promptLine = session.spotlightPromptLineText ?? expandedPromptLineText {
                     Text(promptLine)
                         .font(.system(size: 11.2, weight: .medium))
-                        .foregroundStyle(V6Palette.paper.opacity(presence == .inactive ? 0.34 : 0.52))
+                        .foregroundStyle(summaryPromptColor(for: presence))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -1275,7 +1275,7 @@ private struct IslandSessionRow: View {
                 }
                 Text(session.spotlightAgeBadge)
                     .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                    .foregroundStyle(V6Palette.paper.opacity(presence == .inactive ? 0.32 : 0.45))
+                    .foregroundStyle(summaryAgeColor(for: presence))
                     .frame(minWidth: 30, alignment: .trailing)
                 detailToggleButton(isOpen: showsDetail)
                 if let onDismiss {
@@ -1379,20 +1379,20 @@ private struct IslandSessionRow: View {
         let tint = Color(hex: session.tool.brandColorHex) ?? V6Palette.paper
         return Text(agentBadgeTitle)
             .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-            .foregroundStyle(tint)
+            .foregroundStyle(tint.opacity(notificationChromeOpacity))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(tint.opacity(0.13), in: Capsule())
-            .overlay(Capsule().stroke(tint.opacity(0.35), lineWidth: 1))
+            .background(tint.opacity(notificationBadgeFillOpacity), in: Capsule())
+            .overlay(Capsule().stroke(tint.opacity(notificationBadgeStrokeOpacity), lineWidth: 1))
     }
 
     private func sideBadge(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-            .foregroundStyle(V6Palette.paper.opacity(0.7))
+            .foregroundStyle(V6Palette.paper.opacity(presentation == .notification ? 0.52 : 0.7))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(.white.opacity(0.06), in: Capsule())
+            .background(.white.opacity(presentation == .notification ? 0.045 : 0.06), in: Capsule())
     }
 
     private var agentBadgeTitle: String {
@@ -1448,9 +1448,45 @@ private struct IslandSessionRow: View {
         presentation == .list && stateIndicator == .bar
     }
 
+    private var summaryTitleFont: Font {
+        .system(size: presentation == .notification ? 13.2 : (isActionable ? 13.8 : 13.2), weight: .semibold)
+    }
+
+    private func summaryPromptColor(for presence: IslandSessionPresence) -> Color {
+        if presentation == .notification {
+            return V6Palette.paper.opacity(session.phase == .completed ? 0.38 : 0.46)
+        }
+
+        return V6Palette.paper.opacity(presence == .inactive ? 0.34 : 0.52)
+    }
+
+    private func summaryAgeColor(for presence: IslandSessionPresence) -> Color {
+        if presentation == .notification {
+            return V6Palette.paper.opacity(0.36)
+        }
+
+        return V6Palette.paper.opacity(presence == .inactive ? 0.32 : 0.45)
+    }
+
+    private var notificationChromeOpacity: Double {
+        presentation == .notification ? 0.82 : 1
+    }
+
+    private var notificationBadgeFillOpacity: Double {
+        presentation == .notification ? 0.08 : 0.13
+    }
+
+    private var notificationBadgeStrokeOpacity: Double {
+        presentation == .notification ? 0.24 : 0.35
+    }
+
     private func titleColor(for presence: IslandSessionPresence) -> Color {
         if stateIndicator == .tint && presence != .inactive {
             return statusTint(for: presence)
+        }
+
+        if presentation == .notification, session.phase == .completed {
+            return .white.opacity(0.78)
         }
 
         return headlineColor(for: presence)
@@ -1599,20 +1635,20 @@ private struct IslandSessionRow: View {
             HStack(alignment: .top, spacing: 12) {
                 Text(completionPromptLabel)
                     .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(.white.opacity(completionPromptOpacity))
                     .lineLimit(2)
 
                 Spacer(minLength: 8)
 
                 Text(lang.t("completion.done"))
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(IslandDesignPalette.Status.completed.opacity(0.96))
+                    .foregroundStyle(IslandDesignPalette.Status.completed.opacity(completionDoneOpacity))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
 
             Rectangle()
-                .fill(.white.opacity(0.04))
+                .fill(.white.opacity(completionDividerOpacity))
                 .frame(height: 1)
 
             if !completionMessageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -1627,7 +1663,7 @@ private struct IslandSessionRow: View {
 
             if onReply != nil {
                 Rectangle()
-                    .fill(.white.opacity(0.04))
+                    .fill(.white.opacity(completionDividerOpacity))
                     .frame(height: 1)
 
                 completionReplyInput
@@ -1635,12 +1671,32 @@ private struct IslandSessionRow: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.045))
+                .fill(Color.white.opacity(completionCardFillOpacity))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.white.opacity(0.08))
+                .strokeBorder(.white.opacity(completionCardStrokeOpacity))
         )
+    }
+
+    private var completionPromptOpacity: Double {
+        presentation == .notification ? 0.62 : 0.8
+    }
+
+    private var completionDoneOpacity: Double {
+        presentation == .notification ? 0.82 : 0.96
+    }
+
+    private var completionDividerOpacity: Double {
+        presentation == .notification ? 0.035 : 0.04
+    }
+
+    private var completionCardFillOpacity: Double {
+        presentation == .notification ? 0.035 : 0.045
+    }
+
+    private var completionCardStrokeOpacity: Double {
+        presentation == .notification ? 0.06 : 0.08
     }
 
     @ViewBuilder
