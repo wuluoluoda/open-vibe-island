@@ -941,6 +941,14 @@ private struct SessionListPanelPreview: View {
         items.filter { $0.phase == .running }.count
     }
 
+    private var doneCount: Int {
+        items.filter { $0.phase == .done }.count
+    }
+
+    private var idleCount: Int {
+        items.filter { $0.phase == .idle }.count
+    }
+
     var body: some View {
         ViewThatFits(in: .horizontal) {
             panel(width: preferredPanelWidth)
@@ -989,11 +997,9 @@ private struct SessionListPanelPreview: View {
                 .tracking(1.4)
                 .foregroundStyle(V6Palette.paper.opacity(0.55))
 
-            if waitingCount > 0 {
-                panelChip("\(waitingCount) waiting", tint: IslandDesignPalette.Status.waitingAggregate)
-            }
-            if runningCount > 0 {
-                panelChip("\(runningCount) running", tint: IslandDesignPalette.Status.running)
+            ViewThatFits(in: .horizontal) {
+                previewSessionOverview(compact: false)
+                previewSessionOverview(compact: true)
             }
 
             Spacer(minLength: 0)
@@ -1018,19 +1024,78 @@ private struct SessionListPanelPreview: View {
             .background(.white.opacity(0.08), in: Circle())
     }
 
-    private func panelChip(_ text: String, tint: Color) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(tint)
-                .frame(width: 7, height: 7)
-            Text(text)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+    private func previewSessionOverview(compact: Bool) -> some View {
+        HStack(spacing: compact ? 7 : 9) {
+            previewSessionOverviewMetric(
+                count: items.count,
+                title: "total",
+                compactTitle: "",
+                tint: nil,
+                compact: compact
+            )
+            if waitingCount > 0 {
+                previewSessionOverviewMetric(
+                    count: waitingCount,
+                    title: "waiting",
+                    compactTitle: "wait",
+                    tint: IslandDesignPalette.Status.waitingAggregate,
+                    compact: compact
+                )
+            }
+            if runningCount > 0 {
+                previewSessionOverviewMetric(
+                    count: runningCount,
+                    title: "running",
+                    compactTitle: "run",
+                    tint: IslandDesignPalette.Status.running,
+                    compact: compact
+                )
+            }
+            if doneCount > 0 {
+                previewSessionOverviewMetric(
+                    count: doneCount,
+                    title: "done",
+                    compactTitle: "done",
+                    tint: IslandDesignPalette.Status.completed,
+                    compact: compact
+                )
+            }
+            if idleCount > 0 {
+                previewSessionOverviewMetric(
+                    count: idleCount,
+                    title: "idle",
+                    compactTitle: "idle",
+                    tint: IslandDesignPalette.Status.idle,
+                    compact: compact
+                )
+            }
         }
-        .foregroundStyle(V6Palette.paper.opacity(0.78))
-        .padding(.horizontal, 9)
-        .padding(.vertical, 3)
-        .background(tint.opacity(0.1), in: Capsule())
-        .overlay(Capsule().stroke(tint.opacity(0.26), lineWidth: 1))
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func previewSessionOverviewMetric(
+        count: Int,
+        title: String,
+        compactTitle: String,
+        tint: Color?,
+        compact: Bool
+    ) -> some View {
+        HStack(spacing: 4) {
+            if let tint {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 5.5, height: 5.5)
+            }
+
+            let label = title == "total"
+                ? (compact ? "\(count)" : "\(count) \(title)")
+                : "\(count) \(compact ? compactTitle : title)"
+
+            Text(label)
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(tint == nil ? V6Palette.paper.opacity(0.34) : V6Palette.paper.opacity(0.48))
+        }
     }
 
     private var listBody: some View {

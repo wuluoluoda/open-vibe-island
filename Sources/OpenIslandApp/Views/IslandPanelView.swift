@@ -486,9 +486,11 @@ struct IslandPanelView: View {
 
     private var sessionList: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
+            let referenceDate = context.date
+
             if isNotificationMode {
                 // Notification mode: NO ScrollView — content sizes naturally
-                sessionListContent(context: context)
+                sessionListContent(referenceDate: referenceDate)
                     .padding(.vertical, 2)
                     .background(
                         GeometryReader { geo in
@@ -505,10 +507,10 @@ struct IslandPanelView: View {
                     }
             } else {
                 VStack(spacing: 0) {
-                    sessionPanelHeader
+                    sessionPanelHeader(referenceDate: referenceDate)
 
                     ScrollView(.vertical) {
-                        sessionRowsContent(context: context)
+                        sessionRowsContent(referenceDate: referenceDate)
                     }
                     .scrollIndicators(.hidden)
                     .scrollBounceBehavior(.basedOnSize)
@@ -521,16 +523,16 @@ struct IslandPanelView: View {
     }
 
     @ViewBuilder
-    private func sessionListContent(context: TimelineViewDefaultContext) -> some View {
+    private func sessionListContent(referenceDate: Date) -> some View {
         VStack(spacing: 0) {
             if !isNotificationMode {
-                sessionPanelHeader
+                sessionPanelHeader(referenceDate: referenceDate)
             }
 
             if isNotificationMode, let session = model.activeIslandCardSession {
                 IslandSessionRow(
                     session: session,
-                    referenceDate: context.date,
+                    referenceDate: referenceDate,
                     stateIndicator: model.islandSessionStateIndicator,
                     completedStaleThreshold: model.completedStaleThreshold.seconds,
                     isActionable: true,
@@ -571,7 +573,7 @@ struct IslandPanelView: View {
                         ForEach(section.sessions) { session in
                             IslandSessionRow(
                                 session: session,
-                                referenceDate: context.date,
+                                referenceDate: referenceDate,
                                 stateIndicator: model.islandSessionStateIndicator,
                                 completedStaleThreshold: model.completedStaleThreshold.seconds,
                                 isActionable: session.phase.requiresAttention || session.id == actionableSessionID,
@@ -598,7 +600,7 @@ struct IslandPanelView: View {
     }
 
     @ViewBuilder
-    private func sessionRowsContent(context: TimelineViewDefaultContext) -> some View {
+    private func sessionRowsContent(referenceDate: Date) -> some View {
         ForEach(model.islandSessionSections) { section in
             VStack(alignment: .leading, spacing: 0) {
                 if model.islandSessionGroup != .none {
@@ -608,7 +610,7 @@ struct IslandPanelView: View {
                 ForEach(section.sessions) { session in
                     IslandSessionRow(
                         session: session,
-                        referenceDate: context.date,
+                        referenceDate: referenceDate,
                         stateIndicator: model.islandSessionStateIndicator,
                         completedStaleThreshold: model.completedStaleThreshold.seconds,
                         isActionable: session.phase.requiresAttention || session.id == actionableSessionID,
@@ -628,24 +630,18 @@ struct IslandPanelView: View {
         }
     }
 
-    private var sessionPanelHeader: some View {
-        HStack(spacing: 8) {
+    private func sessionPanelHeader(referenceDate: Date) -> some View {
+        let overview = sessionOverviewItems(referenceDate: referenceDate)
+
+        return HStack(spacing: 8) {
             Text("SESSIONS")
                 .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                 .tracking(1.4)
                 .foregroundStyle(V6Palette.paper.opacity(0.55))
 
-            Text("\(model.islandListSessions.count)")
-                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                .foregroundStyle(V6Palette.paper.opacity(0.34))
-                .padding(.leading, -2)
-
-            if model.liveAttentionCount > 0 {
-                sessionPanelChip("\(model.liveAttentionCount) waiting", tint: IslandDesignPalette.Status.waitingAggregate)
-            }
-
-            if model.liveRunningCount > 0 {
-                sessionPanelChip("\(model.liveRunningCount) running", tint: IslandDesignPalette.Status.running)
+            ViewThatFits(in: .horizontal) {
+                sessionOverviewView(overview, compact: false)
+                sessionOverviewView(overview, compact: true)
             }
 
             Spacer(minLength: 0)
@@ -670,19 +666,61 @@ struct IslandPanelView: View {
         }
     }
 
-    private func sessionPanelChip(_ text: String, tint: Color) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(tint)
-                .frame(width: 7, height: 7)
-            Text(text)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+    private func sessionOverviewItems(referenceDate: Date) -> [SessionOverviewItem] {
+        let sessions = model.islandListSessions
+        guard !sessions.isEmpty else { return [] }
+
+        let threshold = model.completedStaleThreshold.seconds
+        let waiting = sessions.filter(\.phase.requiresAttention).count
+        let running = sessions.filter { $0.phase == .running }.count
+        let done = sessions.filter {
+            $0.phase == .completed
+                && !$0.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
+        }.count
+        let idle = sessions.filter {
+            $0.phase == .completed
+                && $0.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
+        }.count
+
+        return [
+            SessionOverviewItem(id: "total", title: "total", compactTitle: "", count: sessions.count, tint: nil),
+            SessionOverviewItem(id: "waiting", title: "waiting", compactTitle: "wait", count: waiting, tint: IslandDesignPalette.Status.waitingAggregate),
+            SessionOverviewItem(id: "running", title: "running", compactTitle: "run", count: running, tint: IslandDesignPalette.Status.running),
+            SessionOverviewItem(id: "done", title: "done", compactTitle: "done", count: done, tint: IslandDesignPalette.Status.completed),
+            SessionOverviewItem(id: "idle", title: "idle", compactTitle: "idle", count: idle, tint: IslandDesignPalette.Status.idle),
+        ].filter { $0.id == "total" || $0.count > 0 }
+    }
+
+    private func sessionOverviewView(_ items: [SessionOverviewItem], compact: Bool) -> some View {
+        HStack(spacing: compact ? 7 : 9) {
+            ForEach(items) { item in
+                sessionOverviewMetric(item, compact: compact)
+            }
         }
-        .foregroundStyle(V6Palette.paper.opacity(0.78))
-        .padding(.horizontal, 9)
-        .padding(.vertical, 3)
-        .background(tint.opacity(0.10), in: Capsule())
-        .overlay(Capsule().stroke(tint.opacity(0.26), lineWidth: 1))
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func sessionOverviewMetric(_ item: SessionOverviewItem, compact: Bool) -> some View {
+        HStack(spacing: 4) {
+            if let tint = item.tint {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 5.5, height: 5.5)
+            }
+
+            Text(sessionOverviewMetricTitle(item, compact: compact))
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(item.tint == nil ? V6Palette.paper.opacity(0.34) : V6Palette.paper.opacity(0.48))
+        }
+    }
+
+    private func sessionOverviewMetricTitle(_ item: SessionOverviewItem, compact: Bool) -> String {
+        if item.id == "total" {
+            return compact ? "\(item.count)" : "\(item.count) \(item.title)"
+        }
+
+        return "\(item.count) \(compact ? item.compactTitle : item.title)"
     }
 
     private func sessionSectionHeader(_ section: IslandSessionSection) -> some View {
@@ -1056,6 +1094,14 @@ private struct OpenedHeaderMetrics {
     let centerGapWidth: CGFloat
     let rightUsageWidth: CGFloat
     let rightLaneWidth: CGFloat
+}
+
+private struct SessionOverviewItem: Identifiable {
+    let id: String
+    let title: String
+    let compactTitle: String
+    let count: Int
+    let tint: Color?
 }
 
 // MARK: - Session row (opened state)
