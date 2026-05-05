@@ -501,7 +501,11 @@ struct IslandPanelView: View {
 
     @ViewBuilder
     private func sessionListContent(context: TimelineViewDefaultContext) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 0) {
+            if !isNotificationMode {
+                sessionPanelHeader
+            }
+
             if isNotificationMode, let session = model.activeIslandCardSession {
                 IslandSessionRow(
                     session: session,
@@ -534,10 +538,9 @@ struct IslandPanelView: View {
                 }
             } else {
                 ForEach(model.islandSessionSections) { section in
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 0) {
                         if model.islandSessionGroup != .none {
                             sessionSectionHeader(section)
-                                .padding(.top, section.id == model.islandSessionSections.first?.id ? 0 : 6)
                         }
 
                         ForEach(section.sessions) { session in
@@ -561,23 +564,112 @@ struct IslandPanelView: View {
                     }
                 }
             }
+
+            if !isNotificationMode {
+                sessionPanelFooter
+            }
         }
+    }
+
+    private var sessionPanelHeader: some View {
+        HStack(spacing: 8) {
+            Text("SESSIONS")
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .tracking(1.4)
+                .foregroundStyle(V6Palette.paper.opacity(0.55))
+
+            if model.liveAttentionCount > 0 {
+                sessionPanelChip("\(model.liveAttentionCount) waiting", tint: IslandDesignPalette.Status.waitingAggregate)
+            }
+
+            if model.liveRunningCount > 0 {
+                sessionPanelChip("\(model.liveRunningCount) running", tint: IslandDesignPalette.Status.running)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 42)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(.white.opacity(0.055))
+                .frame(height: 1)
+        }
+    }
+
+    private var sessionPanelFooter: some View {
+        HStack(spacing: 8) {
+            Text("\(model.islandListSessions.count) sessions · \(model.liveAttentionCount) waiting")
+            Spacer(minLength: 0)
+            Text("⌃⌥ Space")
+                .opacity(0.45)
+        }
+        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+        .foregroundStyle(V6Palette.paper.opacity(0.42))
+        .padding(.horizontal, 16)
+        .frame(height: 36)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(.white.opacity(0.055))
+                .frame(height: 1)
+        }
+    }
+
+    private func sessionPanelChip(_ text: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(tint)
+                .frame(width: 7, height: 7)
+            Text(text)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+        }
+        .foregroundStyle(V6Palette.paper.opacity(0.78))
+        .padding(.horizontal, 9)
+        .padding(.vertical, 3)
+        .background(tint.opacity(0.10), in: Capsule())
+        .overlay(Capsule().stroke(tint.opacity(0.26), lineWidth: 1))
     }
 
     private func sessionSectionHeader(_ section: IslandSessionSection) -> some View {
         HStack(spacing: 8) {
+            Circle()
+                .fill(sectionTint(for: section))
+                .frame(width: 7, height: 7)
             Text(section.title.uppercased())
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.42))
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .tracking(0.4)
+                .foregroundStyle(sectionLabelColor(for: section))
             Text("\(section.sessions.count)")
-                .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.32))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.white.opacity(0.055), in: Capsule())
+                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                .foregroundStyle(V6Palette.paper.opacity(0.4))
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 7)
+        .background(Color.white.opacity(0.008))
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(.white.opacity(0.055))
+                .frame(height: 1)
+        }
+    }
+
+    private func sectionTint(for section: IslandSessionSection) -> Color {
+        guard let first = section.sessions.first else { return IslandDesignPalette.Status.idle }
+        if section.id == "state-idle" { return IslandDesignPalette.Status.idle }
+        return IslandDesignPalette.Status.tint(for: first.phase)
+    }
+
+    private func sectionLabelColor(for section: IslandSessionSection) -> Color {
+        switch section.id {
+        case "state-approval":
+            return IslandDesignPalette.Status.waitingForApproval.opacity(0.86)
+        case "state-answer":
+            return IslandDesignPalette.Status.waitingForAnswer.opacity(0.86)
+        default:
+            return V6Palette.paper.opacity(0.7)
+        }
     }
 
     // MARK: - Helpers
@@ -1009,151 +1101,37 @@ private struct IslandSessionRow: View {
             ? .inactive
             : ((showsDetail && rawPresence == .inactive) ? .active : rawPresence)
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 14) {
-                statusIndicator(for: presence)
+            rowSummary(presence: presence, showsDetail: showsDetail)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(session.spotlightHeadlineText)
-                            .font(.system(size: isActionable ? 15 : 14, weight: .semibold))
-                            .foregroundStyle(headlineColor(for: presence))
-                            .lineLimit(1)
+            if showsDetail {
+                rowAuxiliaryDetails(presence: presence)
 
-                        Spacer(minLength: 8)
-
-                        HStack(spacing: 6) {
-                            compactBadge(session.tool.displayName, presence: presence)
-                            if session.isRemote {
-                                compactBadge("SSH", presence: presence, icon: "network")
-                            }
-                            if let terminalBadge = session.spotlightTerminalBadge {
-                                compactBadge(terminalBadge, presence: presence)
-                            }
-                            compactBadge(session.spotlightAgeBadge, presence: presence)
-                            detailToggleButton(isOpen: showsDetail)
-                            if let onDismiss {
-                                DismissButton(action: onDismiss)
-                            }
-                        }
-                    }
-
-                    if showsDetail,
-                       let promptLine = session.spotlightPromptLineText ?? expandedPromptLineText {
-                        Text(promptLine)
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.62))
-                            .lineLimit(1)
-                    }
-
-                    if showsDetail,
-                       let activityLine = session.spotlightActivityLineText ?? expandedActivityLineText {
-                        Text(activityLine)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(activityColor(for: presence).opacity(0.94))
-                            .lineLimit(1)
-                    }
-
-                    if showsDetail,
-                       let subagents = session.claudeMetadata?.activeSubagents,
-                       !subagents.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "arrow.triangle.branch")
-                                    .font(.system(size: 9, weight: .medium))
-                                Text(lang.t("subagents.title", subagents.count))
-                                    .font(.system(size: 10.5, weight: .medium))
-                            }
-                            .foregroundStyle(.cyan.opacity(0.8))
-
-                            ForEach(subagents, id: \.agentID) { sub in
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(sub.summary != nil
-                                            ? IslandDesignPalette.Status.completed
-                                            : IslandDesignPalette.Status.running)
-                                        .frame(width: 6, height: 6)
-                                    Text(sub.agentType ?? sub.agentID)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                        .lineLimit(1)
-                                    if let desc = sub.taskDescription {
-                                        Text("(\(desc))")
-                                            .font(.system(size: 10.5))
-                                            .foregroundStyle(.white.opacity(0.5))
-                                            .lineLimit(1)
-                                    }
-                                    Spacer(minLength: 0)
-                                    if sub.summary != nil {
-                                        Text(lang.t("subagents.completed"))
-                                            .font(.system(size: 10, weight: .medium))
-                                            .foregroundStyle(.white.opacity(0.4))
-                                    } else if let started = sub.startedAt {
-                                        TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                                            Text(subagentElapsed(since: started, at: timeline.date))
-                                                .font(.system(size: 10, weight: .medium))
-                                                .foregroundStyle(.white.opacity(0.4))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if showsDetail,
-                       let tasks = session.claudeMetadata?.activeTasks,
-                       !tasks.isEmpty {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(taskSummary(tasks))
-                                .font(.system(size: 10.5, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.45))
-                            ForEach(tasks) { task in
-                                HStack(spacing: 5) {
-                                    taskStatusIcon(task.status)
-                                    Text(task.title)
-                                        .font(.system(size: 10.5, weight: .medium))
-                                        .foregroundStyle(task.status == .completed
-                                            ? .white.opacity(0.4)
-                                            : .white.opacity(0.7))
-                                        .strikethrough(task.status == .completed)
-                                        .lineLimit(1)
-                                }
-                            }
-                        }
-                    }
+                if shouldShowEmbeddedDetailBody {
+                    embeddedDetailBody
+                        .padding(.leading, detailLeadingInset)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 13)
                 }
-            }
-            .padding(.horizontal, isActionable ? 16 : 16)
-            .padding(.vertical, isActionable ? 14 : 14)
-
-            if showsDetail && shouldShowEmbeddedDetailBody {
-                embeddedDetailBody
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 14)
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: isActionable ? 24 : 22, style: .continuous)
-                .fill(rowFillColor(for: presence))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: isActionable ? 24 : 22, style: .continuous)
-                .strokeBorder(actionableBorderColor)
-        )
-        .compositingGroup()
+        .background(rowFillColor(for: presence))
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(.white.opacity(0.045))
+                .frame(height: 1)
+        }
+        .overlay(alignment: .leading) {
+            if stateIndicator == .bar {
+                RoundedRectangle(cornerRadius: 999, style: .continuous)
+                    .fill(statusTint(for: presence))
+                    .frame(width: 3)
+                    .padding(.vertical, showsDetail ? 10 : 8)
+                    .padding(.leading, 14)
+            }
+        }
         .opacity(isStaleCompleted ? 0.7 : 1)
-        .shadow(color: .black.opacity(0.24), radius: isHighlighted ? 8 : 0, y: isHighlighted ? 6 : 0)
-        .overlay(
-            Group {
-                if !isActionable {
-                    Rectangle()
-                        .fill(Color.white.opacity(isHighlighted ? 0 : 0.02))
-                        .frame(height: 1)
-                }
-            },
-            alignment: .bottom
-        )
         .modifier(ConditionalDrawingGroup(enabled: useDrawingGroup && !isActionable))
-        .contentShape(RoundedRectangle(cornerRadius: isActionable ? 24 : 22, style: .continuous))
+        .contentShape(Rectangle())
         .animation(.easeInOut(duration: 0.15), value: isHighlighted)
         .onTapGesture(perform: handlePrimaryTap)
         .onHover { hovering in
@@ -1165,6 +1143,207 @@ private struct IslandSessionRow: View {
                 detailOverride = nil
             }
         }
+    }
+
+    private func rowSummary(presence: IslandSessionPresence, showsDetail: Bool) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            if stateIndicator != .tint && stateIndicator != .bar {
+                statusIndicator(for: presence)
+                    .frame(width: 20, alignment: .top)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(session.spotlightHeadlineText)
+                    .font(.system(size: isActionable ? 13.8 : 13.2, weight: .semibold))
+                    .foregroundStyle(titleColor(for: presence))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                if showsDetail,
+                   let promptLine = session.spotlightPromptLineText ?? expandedPromptLineText {
+                    Text(promptLine)
+                        .font(.system(size: 11.2, weight: .medium))
+                        .foregroundStyle(V6Palette.paper.opacity(presence == .inactive ? 0.34 : 0.52))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
+
+            Spacer(minLength: 10)
+
+            HStack(spacing: 6) {
+                agentBadge
+                if session.isRemote {
+                    sideBadge("SSH")
+                }
+                if let terminalBadge = session.spotlightTerminalBadge {
+                    sideBadge(terminalBadge)
+                }
+                Text(session.spotlightAgeBadge)
+                    .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                    .foregroundStyle(V6Palette.paper.opacity(presence == .inactive ? 0.32 : 0.45))
+                    .frame(minWidth: 30, alignment: .trailing)
+                detailToggleButton(isOpen: showsDetail)
+                if let onDismiss {
+                    DismissButton(action: onDismiss)
+                }
+            }
+        }
+        .padding(.leading, rowLeadingInset)
+        .padding(.trailing, 14)
+        .padding(.top, 11)
+        .padding(.bottom, showsDetail ? 8 : 11)
+    }
+
+    @ViewBuilder
+    private func rowAuxiliaryDetails(presence: IslandSessionPresence) -> some View {
+        if !shouldShowEmbeddedDetailBody,
+           let activityLine = session.spotlightActivityLineText ?? expandedActivityLineText {
+            Text(activityLine)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(activityColor(for: presence).opacity(0.94))
+                .lineLimit(2)
+                .padding(.leading, detailLeadingInset)
+                .padding(.trailing, 16)
+                .padding(.bottom, 10)
+        }
+
+        if let subagents = session.claudeMetadata?.activeSubagents,
+           !subagents.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 9, weight: .medium))
+                    Text(lang.t("subagents.title", subagents.count))
+                        .font(.system(size: 10.5, weight: .medium))
+                }
+                .foregroundStyle(.cyan.opacity(0.8))
+
+                ForEach(subagents, id: \.agentID) { sub in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(sub.summary != nil
+                                ? IslandDesignPalette.Status.completed
+                                : IslandDesignPalette.Status.running)
+                            .frame(width: 6, height: 6)
+                        Text(sub.agentType ?? sub.agentID)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .lineLimit(1)
+                        if let desc = sub.taskDescription {
+                            Text("(\(desc))")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.white.opacity(0.5))
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                        if sub.summary != nil {
+                            Text(lang.t("subagents.completed"))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.4))
+                        } else if let started = sub.startedAt {
+                            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                                Text(subagentElapsed(since: started, at: timeline.date))
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.4))
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.leading, detailLeadingInset)
+            .padding(.trailing, 16)
+            .padding(.bottom, 10)
+        }
+
+        if let tasks = session.claudeMetadata?.activeTasks,
+           !tasks.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(taskSummary(tasks))
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                ForEach(tasks) { task in
+                    HStack(spacing: 5) {
+                        taskStatusIcon(task.status)
+                        Text(task.title)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(task.status == .completed
+                                ? .white.opacity(0.4)
+                                : .white.opacity(0.7))
+                            .strikethrough(task.status == .completed)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .padding(.leading, detailLeadingInset)
+            .padding(.trailing, 16)
+            .padding(.bottom, 10)
+        }
+    }
+
+    private var agentBadge: some View {
+        let tint = Color(hex: session.tool.brandColorHex) ?? V6Palette.paper
+        return Text(agentBadgeTitle)
+            .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.13), in: Capsule())
+            .overlay(Capsule().stroke(tint.opacity(0.35), lineWidth: 1))
+    }
+
+    private func sideBadge(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+            .foregroundStyle(V6Palette.paper.opacity(0.7))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(.white.opacity(0.06), in: Capsule())
+    }
+
+    private var agentBadgeTitle: String {
+        switch session.tool {
+        case .claudeCode:
+            "claude"
+        case .geminiCLI:
+            "gemini"
+        case .qwenCode:
+            "qwen"
+        case .kimiCLI:
+            "kimi"
+        default:
+            session.tool.shortName.lowercased()
+        }
+    }
+
+    private var rowLeadingInset: CGFloat {
+        switch stateIndicator {
+        case .bar:
+            28
+        case .tint:
+            16
+        case .animatedDot, .glyph:
+            16
+        }
+    }
+
+    private var detailLeadingInset: CGFloat {
+        switch stateIndicator {
+        case .bar:
+            28
+        case .tint:
+            16
+        case .animatedDot, .glyph:
+            46
+        }
+    }
+
+    private func titleColor(for presence: IslandSessionPresence) -> Color {
+        if stateIndicator == .tint && presence != .inactive {
+            return statusTint(for: presence)
+        }
+
+        return headlineColor(for: presence)
     }
 
     private var actionableBorderColor: Color {
@@ -1520,7 +1699,7 @@ private struct IslandSessionRow: View {
     }
 
     private func rowFillColor(for presence: IslandSessionPresence) -> Color {
-        let base = isHighlighted ? Color.white.opacity(isActionable ? 0.06 : 0.05) : Color.black
+        let base = isHighlighted ? Color.white.opacity(isActionable ? 0.06 : 0.04) : Color.clear
         guard stateIndicator == .tint else { return base }
 
         let tintOpacity: Double
