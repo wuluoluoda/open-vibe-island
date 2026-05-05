@@ -53,17 +53,18 @@ extension AgentSession {
     /// Estimated row height matching `IslandSessionRow` layout for viewport sizing.
     func estimatedIslandRowHeight(at date: Date) -> CGFloat {
         let presence = islandPresence(at: date)
-        // Base: vertical padding (28) + headline (~18) + rounding (2)
-        var height: CGFloat = 48
+        // v8 list rows are full-width scan rows, not rounded cards.
+        // Base: vertical padding (22) + headline (~17) + divider rounding.
+        var height: CGFloat = 40
         guard presence != .inactive else { return height }
-        if spotlightPromptLineText != nil { height += 24 }   // spacing (8) + text (16)
-        if spotlightActivityLineText != nil { height += 22 }  // spacing (8) + text (14)
+        if spotlightPromptLineText != nil { height += 17 }
+        if spotlightActivityLineText != nil { height += 20 }
         if let subagents = claudeMetadata?.activeSubagents, !subagents.isEmpty {
-            height += 22  // spacing (8) + header (14)
+            height += 18
             height += CGFloat(subagents.count) * 18  // each subagent row (spacing 4 + text 14)
         }
         if let tasks = claudeMetadata?.activeTasks, !tasks.isEmpty {
-            height += 20  // spacing (8) + summary (12)
+            height += 17
             height += CGFloat(tasks.count) * 16  // each task row (spacing 3 + text 13)
         }
         return height
@@ -1372,10 +1373,18 @@ private struct IslandSessionRow: View {
     }
 
     private var shouldShowEmbeddedDetailBody: Bool {
-        if session.phase.requiresAttention || session.phase == .completed {
+        if session.phase.requiresAttention {
             return true
         }
+        if session.phase == .completed {
+            return isActionable && completionHasExpandedBody
+        }
         return session.phase == .running && runningDetailText != nil
+    }
+
+    private var completionHasExpandedBody: Bool {
+        !completionMessageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || onReply != nil
     }
 
     @ViewBuilder
@@ -1401,69 +1410,51 @@ private struct IslandSessionRow: View {
                     .foregroundStyle(.white.opacity(0.82))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
                             .fill(Color.white.opacity(0.045))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
                             .strokeBorder(.white.opacity(0.06))
                     )
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.035))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.white.opacity(0.06))
-        )
     }
 
     // MARK: - Approval action area
 
     private var approvalActionBody: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(IslandDesignPalette.Status.waitingForApproval)
-                Text(commandLabel)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(IslandDesignPalette.Status.waitingForApproval)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Tool permission requested")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(V6Palette.paper.opacity(0.86))
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(commandPreviewText)
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(V6Palette.paper.opacity(0.78))
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let path = session.permissionRequest?.affectedPath.trimmedForNotificationCard,
                    !path.isEmpty {
                     Text(path)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.42))
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(V6Palette.paper.opacity(0.42))
                         .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .fixedSize(horizontal: false, vertical: true)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(IslandDesignPalette.Status.waitingForApproval.opacity(0.07))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(IslandDesignPalette.Status.waitingForApproval.opacity(0.18))
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.white.opacity(0.045))
             )
 
             HStack(spacing: 8) {
@@ -1514,18 +1505,20 @@ private struct IslandSessionRow: View {
                     .foregroundStyle(IslandDesignPalette.Status.completed.opacity(0.96))
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
 
             Rectangle()
                 .fill(.white.opacity(0.04))
                 .frame(height: 1)
 
-            AutoHeightScrollView(maxHeight: 260) {
-                Markdown(completionMessageText)
-                    .markdownTheme(.completionCard)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+            if !completionMessageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                AutoHeightScrollView(maxHeight: 160) {
+                    Markdown(completionMessageText)
+                        .markdownTheme(.completionCard)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                }
             }
 
             if onReply != nil {
@@ -1537,11 +1530,11 @@ private struct IslandSessionRow: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.white.opacity(0.045))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(.white.opacity(0.08))
         )
     }
@@ -1584,14 +1577,15 @@ private struct IslandSessionRow: View {
         if let prompt = session.latestUserPromptText?.trimmedForNotificationCard, !prompt.isEmpty {
             return "You: \(prompt)"
         }
-        return "You:"
+        return session.summary.trimmedForNotificationCard.isEmpty ? "You" : "You:"
     }
 
     private var completionMessageText: String {
         if let text = session.completionAssistantMessageText?.trimmedForNotificationCard, !text.isEmpty {
             return text
         }
-        return session.summary
+        let summary = session.summary.trimmedForNotificationCard
+        return summary == SessionPhase.completed.displayName ? "" : summary
     }
 
     private var commandLabel: String {
@@ -1818,7 +1812,7 @@ private struct StructuredQuestionPromptView: View {
     @State private var freeformTexts: [String: String] = [:]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             if showsPromptTitle {
                 Text(promptTitle)
                     .font(.system(size: 13, weight: .semibold))
@@ -1826,7 +1820,7 @@ private struct StructuredQuestionPromptView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(structuredQuestions, id: \.question) { question in
                     questionRow(question)
                 }
@@ -1838,15 +1832,15 @@ private struct StructuredQuestionPromptView: View {
                 .disabled(!hasCompleteSelection)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.white.opacity(0.04))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(.white.opacity(0.06))
         )
     }
@@ -1908,7 +1902,7 @@ private struct StructuredQuestionPromptView: View {
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
-                .padding(.vertical, 5)
+                .padding(.vertical, 4)
                 .padding(.horizontal, 10)
             }
             .buttonStyle(.plain)

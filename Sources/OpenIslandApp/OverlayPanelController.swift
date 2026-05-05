@@ -14,16 +14,11 @@ final class OverlayPanelController {
     /// Must match `IslandPanelView.maxSessionListHeight` — the AutoHeightScrollView cap.
     private static let maxSessionListHeight: CGFloat = 560
     private static let maxVisibleSessionRows: Int = 6
-    private static let openedRowSpacing: CGFloat = 6
-    // Content padding top (8) + scroll padding (4) + outerBottomPadding (14) + header-content gap (12)
-    // + bottomInset (14, the VStack .padding(.bottom, bottomInset) that subtracts from usable height)
-    // = 52.  The extra 14 pt avoids the card bottom being clipped by the .clipped() modifier when
-    // the measured height is not yet available (first notification render).
-    private static let openedContentVerticalInsets: CGFloat = 52
+    private static let openedRowSpacing: CGFloat = 0
+    // Content padding top + scroll padding + v8 list header/footer + bottom inset.
+    // Rows are now full-width scan rows, so the old inter-card spacing is gone.
+    private static let openedContentVerticalInsets: CGFloat = 102
     private static let openedEmptyStateHeight: CGFloat = 108
-    // Approval card: header row (~72) + actionableBody padding (16*2 + 14 bottom) + body content (~186)
-    // Bumped to 310 to ensure the estimated panel height is never smaller than the actual rendered card.
-    private static let approvalCardHeight: CGFloat = 310
     private static let questionCardBaseHeight: CGFloat = 110
     private static let questionCardMaxHeight: CGFloat = 420
     // Completion card chrome breakdown (everything except the scrollable text):
@@ -555,7 +550,7 @@ final class OverlayPanelController {
     private func actionableBodyHeight(for session: AgentSession, model: AppModel) -> CGFloat {
         switch session.phase {
         case .waitingForApproval:
-            return Self.approvalCardHeight - 44
+            return 118
         case .waitingForAnswer:
             return questionCardHeight(for: session.questionPrompt) - 44
         case .completed:
