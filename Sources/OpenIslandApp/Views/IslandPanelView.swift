@@ -675,11 +675,10 @@ struct IslandPanelView: View {
         let running = sessions.filter { $0.phase == .running }.count
         let done = sessions.filter {
             $0.phase == .completed
-                && !$0.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
+                && !isIdleSessionOverviewItem($0, referenceDate: referenceDate, threshold: threshold)
         }.count
         let idle = sessions.filter {
-            $0.phase == .completed
-                && $0.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
+            isIdleSessionOverviewItem($0, referenceDate: referenceDate, threshold: threshold)
         }.count
 
         return [
@@ -689,6 +688,16 @@ struct IslandPanelView: View {
             SessionOverviewItem(id: "done", title: "done", compactTitle: "done", count: done, tint: IslandDesignPalette.Status.completed),
             SessionOverviewItem(id: "idle", title: "idle", compactTitle: "idle", count: idle, tint: IslandDesignPalette.Status.idle),
         ].filter { $0.id == "total" || $0.count > 0 }
+    }
+
+    private func isIdleSessionOverviewItem(
+        _ session: AgentSession,
+        referenceDate: Date,
+        threshold: TimeInterval
+    ) -> Bool {
+        guard session.phase == .completed else { return false }
+        return session.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
+            || session.islandPresence(at: referenceDate) == .inactive
     }
 
     private func sessionOverviewView(_ items: [SessionOverviewItem], compact: Bool) -> some View {
