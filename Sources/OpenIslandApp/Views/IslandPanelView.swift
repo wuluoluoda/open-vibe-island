@@ -635,6 +635,11 @@ struct IslandPanelView: View {
                 .tracking(1.4)
                 .foregroundStyle(V6Palette.paper.opacity(0.55))
 
+            Text("\(model.islandListSessions.count)")
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(V6Palette.paper.opacity(0.34))
+                .padding(.leading, -2)
+
             if model.liveAttentionCount > 0 {
                 sessionPanelChip("\(model.liveAttentionCount) waiting", tint: IslandDesignPalette.Status.waitingAggregate)
             }
@@ -643,11 +648,16 @@ struct IslandPanelView: View {
                 sessionPanelChip("\(model.liveRunningCount) running", tint: IslandDesignPalette.Status.running)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+
+            Text("⌃⌥ Space")
+                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                .foregroundStyle(V6Palette.paper.opacity(0.34))
+                .lineLimit(1)
         }
         .padding(.leading, sessionListSideInset)
         .padding(.trailing, sessionListSideInset)
-        .frame(height: 42)
+        .frame(height: 36)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(.white.opacity(0.055))
@@ -656,17 +666,8 @@ struct IslandPanelView: View {
     }
 
     private var sessionPanelFooter: some View {
-        HStack(spacing: 8) {
-            Text("\(model.islandListSessions.count) sessions · \(model.liveAttentionCount) waiting")
-            Spacer(minLength: 0)
-            Text("⌃⌥ Space")
-                .opacity(0.45)
-        }
-        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-        .foregroundStyle(V6Palette.paper.opacity(0.42))
-        .padding(.leading, sessionListSideInset)
-        .padding(.trailing, sessionListSideInset)
-        .frame(height: 36)
+        Color.clear
+            .frame(height: 10)
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(.white.opacity(0.055))
