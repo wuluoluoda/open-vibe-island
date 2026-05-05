@@ -931,6 +931,10 @@ struct IslandPanelView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.74))
 
+            Text(provider.peakWindowLabel)
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.42))
+
             Text("\(provider.peakUsagePercentage)%")
                 .font(.system(size: 11.5, weight: .bold, design: .monospaced))
                 .foregroundStyle(usageColor(for: provider.peakUsedPercentage))
@@ -1006,12 +1010,22 @@ private struct UsageProviderPresentation: Identifiable {
     let title: String
     let windows: [UsageWindowPresentation]
 
+    var peakWindow: UsageWindowPresentation? {
+        windows.max { lhs, rhs in
+            lhs.usedPercentage < rhs.usedPercentage
+        }
+    }
+
+    var peakWindowLabel: String {
+        peakWindow?.label ?? ""
+    }
+
     var peakUsedPercentage: Double {
-        windows.map(\.usedPercentage).max() ?? 0
+        peakWindow?.usedPercentage ?? 0
     }
 
     var peakUsagePercentage: Int {
-        Int(peakUsedPercentage.rounded())
+        peakWindow?.roundedUsedPercentage ?? 0
     }
 
     var shortTitle: String {
