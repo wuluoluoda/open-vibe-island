@@ -1640,34 +1640,6 @@ private struct IslandSessionRow: View {
 
     private var completionActionBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(completionContextTitle)
-                        .font(.system(size: 12.2, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(completionPromptOpacity))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    Text(completionContextSubtitle)
-                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(completionSubtitleOpacity))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-
-                Spacer(minLength: 8)
-
-                Text(lang.t("completion.done"))
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(IslandDesignPalette.Status.completed.opacity(completionDoneOpacity))
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-
-            Rectangle()
-                .fill(.white.opacity(completionDividerOpacity))
-                .frame(height: 1)
-
             if !completionMessageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 AutoHeightScrollView(maxHeight: 160) {
                     Markdown(completionMessageText)
@@ -1676,6 +1648,8 @@ private struct IslandSessionRow: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
                 }
+            } else {
+                completionEmptyState
             }
 
             if onReply != nil {
@@ -1696,14 +1670,6 @@ private struct IslandSessionRow: View {
         )
     }
 
-    private var completionPromptOpacity: Double {
-        presentation == .notification ? 0.56 : 0.68
-    }
-
-    private var completionSubtitleOpacity: Double {
-        presentation == .notification ? 0.38 : 0.48
-    }
-
     private var completionDoneOpacity: Double {
         presentation == .notification ? 0.82 : 0.96
     }
@@ -1718,6 +1684,18 @@ private struct IslandSessionRow: View {
 
     private var completionCardStrokeOpacity: Double {
         presentation == .notification ? 0.06 : 0.08
+    }
+
+    private var completionEmptyState: some View {
+        HStack {
+            Text(lang.t("completion.done"))
+                .font(.system(size: 11.5, weight: .bold))
+                .foregroundStyle(IslandDesignPalette.Status.completed.opacity(completionDoneOpacity))
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
@@ -1753,28 +1731,6 @@ private struct IslandSessionRow: View {
     }
 
     // MARK: - Actionable helpers
-
-    private var completionContextTitle: String {
-        let workspace = session.spotlightWorkspaceName.trimmedForNotificationCard
-        let title = workspace.isEmpty ? session.title.trimmedForNotificationCard : workspace
-        guard let branch = session.spotlightWorktreeBranch?.trimmedForNotificationCard,
-              !branch.isEmpty,
-              branch != "main" else {
-            return title.isEmpty ? session.tool.displayName : title
-        }
-
-        return "\(title) · \(branch)"
-    }
-
-    private var completionContextSubtitle: String {
-        let age = session.spotlightAgeBadge
-        if let terminal = session.spotlightTerminalBadge?.trimmedForNotificationCard,
-           !terminal.isEmpty {
-            return "\(session.tool.displayName) · \(terminal) · \(age)"
-        }
-
-        return "\(session.tool.displayName) · \(age)"
-    }
 
     private var completionMessageText: String {
         if let text = session.completionAssistantMessageText?.trimmedForNotificationCard, !text.isEmpty {
