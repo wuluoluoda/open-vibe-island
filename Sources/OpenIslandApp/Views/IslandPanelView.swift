@@ -1247,7 +1247,7 @@ private struct IslandSessionRow: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(session.spotlightHeadlineText)
+                Text(summaryHeadlineText)
                     .font(summaryTitleFont)
                     .foregroundStyle(titleColor(for: presence))
                     .lineLimit(1)
@@ -1397,10 +1397,45 @@ private struct IslandSessionRow: View {
 
     private var summaryPromptLineText: String? {
         if presentation == .notification {
+            if session.phase == .completed {
+                return notificationCompletedPromptLineText
+            }
             return session.notificationHeaderPromptLineText
         }
 
         return session.spotlightPromptLineText ?? expandedPromptLineText
+    }
+
+    private var summaryHeadlineText: String {
+        if presentation == .notification, session.phase == .completed {
+            return notificationWorkspaceHeadlineText
+        }
+
+        return session.spotlightHeadlineText
+    }
+
+    private var notificationWorkspaceHeadlineText: String {
+        let workspace = session.spotlightWorkspaceName.trimmedForNotificationCard
+        let title = workspace.isEmpty ? session.tool.displayName : workspace
+        guard let branch = session.spotlightWorktreeBranch?.trimmedForNotificationCard,
+              !branch.isEmpty,
+              branch != "main" else {
+            return title
+        }
+
+        return "\(title) (\(branch))"
+    }
+
+    private var notificationCompletedPromptLineText: String? {
+        if let prompt = session.latestUserPromptText?.trimmedForNotificationCard, !prompt.isEmpty {
+            return "You: \(prompt)"
+        }
+
+        if let prompt = session.initialUserPromptText?.trimmedForNotificationCard, !prompt.isEmpty {
+            return "You: \(prompt)"
+        }
+
+        return nil
     }
 
     private var agentBadgeTitle: String {
