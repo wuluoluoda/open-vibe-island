@@ -95,6 +95,7 @@
 "settings.appearance.staleThreshold.fiveMinutes" = "5 分钟";
 "settings.appearance.staleThreshold.tenMinutes" = "10 分钟";
 "settings.appearance.staleThreshold.twentyMinutes" = "20 分钟";
+"settings.appearance.staleThreshold.never" = "永不";
 
 /* Settings - Display */
 "settings.display.monitor" = "显示器";

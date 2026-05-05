@@ -466,7 +466,11 @@ struct AppearanceSettingsPane: View {
             note: lang.t("settings.appearance.staleThreshold.note")
         )
 
-        HStack(spacing: 12) {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 104), spacing: 12)],
+            alignment: .leading,
+            spacing: 12
+        ) {
             ForEach(IslandCompletedStaleThreshold.allCases) { option in
                 optionCard(
                     selected: editingPreferences.completedStaleThreshold == option,
@@ -599,6 +603,7 @@ struct AppearanceSettingsPane: View {
         case .fiveMinutes:   lang.t("settings.appearance.staleThreshold.fiveMinutes")
         case .tenMinutes:    lang.t("settings.appearance.staleThreshold.tenMinutes")
         case .twentyMinutes: lang.t("settings.appearance.staleThreshold.twentyMinutes")
+        case .never:         lang.t("settings.appearance.staleThreshold.never")
         }
     }
 

@@ -283,6 +283,21 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func islandSessionSectionsKeepCompletedInDoneWhenStaleThresholdIsNever() {
+        let now = Date()
+        let model = AppModel()
+        model.islandSessionGroup = .state
+        model.completedStaleThreshold = .never
+
+        var oldDone = listSession(id: "old-done", phase: .completed, updatedAt: now.addingTimeInterval(-86_400))
+        oldDone.isProcessAlive = true
+        model.state = SessionState(sessions: [oldDone])
+
+        #expect(model.islandSessionSections.map(\.id) == ["state-done"])
+        #expect(model.islandSessionSections.first?.sessions.first?.id == "old-done")
+    }
+
+    @Test
     func islandSessionListCanSortByLastUpdate() {
         let now = Date()
         let model = AppModel()
@@ -309,7 +324,7 @@ struct AppModelSessionListTests {
         model.updateAppearancePreferences(for: .topBar) {
             $0.sessionGroup = .project
             $0.sessionStateIndicator = .tint
-            $0.completedStaleThreshold = .twentyMinutes
+            $0.completedStaleThreshold = .never
         }
 
         model.overlayPlacementDiagnostics = placementDiagnostics(mode: .notch)
@@ -320,7 +335,7 @@ struct AppModelSessionListTests {
         model.overlayPlacementDiagnostics = placementDiagnostics(mode: .topBar)
         #expect(model.islandSessionGroup == .project)
         #expect(model.islandSessionStateIndicator == .tint)
-        #expect(model.completedStaleThreshold == .twentyMinutes)
+        #expect(model.completedStaleThreshold == .never)
 
         let reloaded = AppModel()
         reloaded.overlayPlacementDiagnostics = placementDiagnostics(mode: .notch)
@@ -329,6 +344,7 @@ struct AppModelSessionListTests {
         reloaded.overlayPlacementDiagnostics = placementDiagnostics(mode: .topBar)
         #expect(reloaded.islandSessionGroup == .project)
         #expect(reloaded.islandSessionStateIndicator == .tint)
+        #expect(reloaded.completedStaleThreshold == .never)
     }
 
     @Test

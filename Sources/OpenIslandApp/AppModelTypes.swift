@@ -92,6 +92,7 @@ enum IslandCompletedStaleThreshold: String, CaseIterable, Identifiable, Sendable
     case fiveMinutes
     case tenMinutes
     case twentyMinutes
+    case never
 
     var id: String { rawValue }
 
@@ -101,6 +102,7 @@ enum IslandCompletedStaleThreshold: String, CaseIterable, Identifiable, Sendable
         case .fiveMinutes:   return 5 * 60
         case .tenMinutes:    return 10 * 60
         case .twentyMinutes: return 20 * 60
+        case .never:         return .infinity
         }
     }
 }

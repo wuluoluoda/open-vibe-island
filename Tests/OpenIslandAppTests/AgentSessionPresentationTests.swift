@@ -117,6 +117,26 @@ struct AgentSessionPresentationTests {
     }
 
     @Test
+    func completedSessionDoesNotBecomeV8StaleWhenThresholdIsNever() {
+        let referenceDate = Date(timeIntervalSince1970: 10_000)
+        let session = AgentSession(
+            id: "session-1",
+            title: "Codex · worktree",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Ready",
+            updatedAt: referenceDate.addingTimeInterval(-86_400)
+        )
+
+        #expect(!session.isStaleCompletedForIsland(
+            at: referenceDate,
+            threshold: IslandCompletedStaleThreshold.never.seconds
+        ))
+    }
+
+    @Test
     func nonCompletedSessionsDoNotBecomeV8Stale() {
         let referenceDate = Date(timeIntervalSince1970: 10_000)
         let session = AgentSession(

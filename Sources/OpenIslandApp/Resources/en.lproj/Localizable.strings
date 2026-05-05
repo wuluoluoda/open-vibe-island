@@ -95,6 +95,7 @@
 "settings.appearance.staleThreshold.fiveMinutes" = "5 min";
 "settings.appearance.staleThreshold.tenMinutes" = "10 min";
 "settings.appearance.staleThreshold.twentyMinutes" = "20 min";
+"settings.appearance.staleThreshold.never" = "Never";
 
 /* Settings - Display */
 "settings.display.monitor" = "Monitor";
