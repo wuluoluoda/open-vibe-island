@@ -5,11 +5,10 @@ import OpenIslandCore
 
 @MainActor
 final class OverlayPanelController {
-    private static let minimumOpenedPanelWidth: CGFloat = 680
-    private static let maximumOpenedPanelWidth: CGFloat = 740
-    private static let openedPanelWidthFactor: CGFloat = 0.46
+    private static let preferredNotchOpenedPanelWidth: CGFloat = 540
+    private static let preferredTopBarOpenedPanelWidth: CGFloat = 520
     private static let preferredNotificationPanelWidth: CGFloat = 620
-    private static let openedContentWidthPadding: CGFloat = 28
+    private static let openedContentWidthPadding: CGFloat = 0
     private static let openedContentBottomPadding: CGFloat = 0
     /// Must match `IslandPanelView.maxSessionListHeight` — the AutoHeightScrollView cap.
     private static let maxSessionListHeight: CGFloat = 560
@@ -17,7 +16,7 @@ final class OverlayPanelController {
     private static let openedRowSpacing: CGFloat = 0
     // Content padding top + scroll padding + v8 list header/footer + bottom inset.
     // Rows are now full-width scan rows, so the old inter-card spacing is gone.
-    private static let openedContentVerticalInsets: CGFloat = 102
+    private static let openedContentVerticalInsets: CGFloat = 84
     private static let openedEmptyStateHeight: CGFloat = 108
     private static let questionCardBaseHeight: CGFloat = 110
     private static let questionCardMaxHeight: CGFloat = 420
@@ -370,11 +369,11 @@ final class OverlayPanelController {
     }
 
     func openedPanelWidth(for screen: NSScreen?) -> CGFloat {
-        guard let screen else { return 820 }
-        return min(
-            max(screen.visibleFrame.width * Self.openedPanelWidthFactor, Self.minimumOpenedPanelWidth),
-            min(Self.maximumOpenedPanelWidth, screen.visibleFrame.width - 32)
-        )
+        guard let screen else { return Self.preferredTopBarOpenedPanelWidth }
+        let preferredWidth = screen.safeAreaInsets.top > 0
+            ? Self.preferredNotchOpenedPanelWidth
+            : Self.preferredTopBarOpenedPanelWidth
+        return max(360, min(preferredWidth, screen.visibleFrame.width - 32))
     }
 
     func notificationPanelWidth(for screen: NSScreen?) -> CGFloat {

@@ -183,8 +183,8 @@ struct IslandPanelView: View {
         let layoutWidth = max(0, availableSize.width - (panelShadowHorizontalInset * 2))
         let layoutHeight = max(0, availableSize.height - panelShadowBottomInset)
 
-        let outerHorizontalPadding: CGFloat = 28
-        let outerBottomPadding: CGFloat = 14
+        let outerHorizontalPadding: CGFloat = 0
+        let outerBottomPadding: CGFloat = 0
         let openedWidth = max(0, layoutWidth - outerHorizontalPadding)
         let openedHeight = max(closedNotchHeight, layoutHeight - outerBottomPadding)
 
@@ -245,8 +245,8 @@ struct IslandPanelView: View {
 
     @ViewBuilder
     private func openedSurface(width openedWidth: CGFloat, height openedHeight: CGFloat) -> some View {
-        let horizontalInset = 14.0
-        let bottomInset = 14.0
+        let horizontalInset = 0.0
+        let bottomInset = 0.0
         let surfaceWidth = openedWidth + (horizontalInset * 2)
         let surfaceHeight = openedHeight + bottomInset
         let surfaceShape = OpenedIslandSurfaceShape(
@@ -263,8 +263,8 @@ struct IslandPanelView: View {
                     .frame(height: closedNotchHeight)
 
                 openedContent
-                    .frame(width: openedWidth - 24)
-                    .frame(maxHeight: max(0, openedHeight - closedNotchHeight - 12), alignment: .top)
+                    .frame(width: openedWidth)
+                    .frame(maxHeight: max(0, openedHeight - closedNotchHeight), alignment: .top)
                     .clipped()
             }
             .frame(width: openedWidth, height: openedHeight, alignment: .top)
@@ -370,18 +370,22 @@ struct IslandPanelView: View {
         VStack(spacing: 8) {
             if !model.hasAnyInstalledAgent {
                 installHooksHint
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
             }
 
             if model.shouldShowSessionBootstrapPlaceholder {
                 sessionBootstrapPlaceholder
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
             } else if model.islandListSessions.isEmpty {
                 emptyState
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
             } else {
                 sessionList
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 8)
         .padding(.bottom, 0)
     }
 
@@ -467,6 +471,10 @@ struct IslandPanelView: View {
 
     private static let maxSessionListHeight: CGFloat = 560
 
+    private var sessionListSideInset: CGFloat {
+        usesNotchAwareOpenedHeader ? 46 : 16
+    }
+
     private var sessionList: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             if isNotificationMode {
@@ -487,14 +495,17 @@ struct IslandPanelView: View {
                         }
                     }
             } else {
-                // List mode: scroll when content exceeds the panel's available space.
-                // The parent frame constraint (currentHeight - closedNotchHeight - 12)
-                // determines the viewport; ScrollView handles overflow naturally.
-                ScrollView(.vertical) {
-                    sessionListContent(context: context)
+                VStack(spacing: 0) {
+                    sessionPanelHeader
+
+                    ScrollView(.vertical) {
+                        sessionRowsContent(context: context)
+                    }
+                    .scrollIndicators(.hidden)
+                    .scrollBounceBehavior(.basedOnSize)
+
+                    sessionPanelFooter
                 }
-                .scrollIndicators(.hidden)
-                .scrollBounceBehavior(.basedOnSize)
                 .padding(.vertical, 2)
             }
         }
@@ -516,6 +527,7 @@ struct IslandPanelView: View {
                     isActionable: true,
                     useDrawingGroup: model.notchStatus == .opened,
                     isInteractive: model.notchStatus == .opened,
+                    sideInset: sessionListSideInset,
                     lang: model.lang,
                     onApprove: { model.approvePermission(for: session.id, action: $0) },
                     onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
@@ -553,6 +565,7 @@ struct IslandPanelView: View {
                                 isActionable: session.phase.requiresAttention || session.id == actionableSessionID,
                                 useDrawingGroup: model.notchStatus == .opened,
                                 isInteractive: model.notchStatus == .opened,
+                                sideInset: sessionListSideInset,
                                 lang: model.lang,
                                 onApprove: { model.approvePermission(for: session.id, action: $0) },
                                 onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
@@ -568,6 +581,37 @@ struct IslandPanelView: View {
 
             if !isNotificationMode {
                 sessionPanelFooter
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sessionRowsContent(context: TimelineViewDefaultContext) -> some View {
+        ForEach(model.islandSessionSections) { section in
+            VStack(alignment: .leading, spacing: 0) {
+                if model.islandSessionGroup != .none {
+                    sessionSectionHeader(section)
+                }
+
+                ForEach(section.sessions) { session in
+                    IslandSessionRow(
+                        session: session,
+                        referenceDate: context.date,
+                        stateIndicator: model.islandSessionStateIndicator,
+                        completedStaleThreshold: model.completedStaleThreshold.seconds,
+                        isActionable: session.phase.requiresAttention || session.id == actionableSessionID,
+                        useDrawingGroup: model.notchStatus == .opened,
+                        isInteractive: model.notchStatus == .opened,
+                        sideInset: sessionListSideInset,
+                        lang: model.lang,
+                        onApprove: { model.approvePermission(for: session.id, action: $0) },
+                        onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
+                        onReply: TerminalTextSender.canReply(to: session, enabled: model.completionReplyEnabled)
+                            ? { model.replyToSession(session, text: $0) } : nil,
+                        onJump: { model.jumpToSession(session) },
+                        onDismiss: session.isRemote ? { model.dismissSession(session.id) } : nil
+                    )
+                }
             }
         }
     }
@@ -589,7 +633,8 @@ struct IslandPanelView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, sessionListSideInset)
+        .padding(.trailing, sessionListSideInset)
         .frame(height: 42)
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -607,7 +652,8 @@ struct IslandPanelView: View {
         }
         .font(.system(size: 10.5, weight: .medium, design: .monospaced))
         .foregroundStyle(V6Palette.paper.opacity(0.42))
-        .padding(.horizontal, 16)
+        .padding(.leading, sessionListSideInset)
+        .padding(.trailing, sessionListSideInset)
         .frame(height: 36)
         .overlay(alignment: .top) {
             Rectangle()
@@ -645,7 +691,8 @@ struct IslandPanelView: View {
                 .foregroundStyle(V6Palette.paper.opacity(0.4))
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, sessionListSideInset)
+        .padding(.trailing, sessionListSideInset)
         .padding(.top, 10)
         .padding(.bottom, 7)
         .background(Color.white.opacity(0.008))
@@ -1075,6 +1122,7 @@ private struct IslandSessionRow: View {
     var isActionable: Bool = false
     var useDrawingGroup: Bool = true
     var isInteractive: Bool = true
+    var sideInset: CGFloat = 16
     var lang: LanguageManager = .shared
     var onApprove: ((ApprovalAction) -> Void)?
     var onAnswer: ((QuestionPromptResponse) -> Void)?
@@ -1110,7 +1158,7 @@ private struct IslandSessionRow: View {
                 if shouldShowEmbeddedDetailBody {
                     embeddedDetailBody
                         .padding(.leading, detailLeadingInset)
-                        .padding(.trailing, 16)
+                        .padding(.trailing, sideInset)
                         .padding(.bottom, 13)
                 }
             }
@@ -1191,7 +1239,7 @@ private struct IslandSessionRow: View {
             }
         }
         .padding(.leading, rowLeadingInset)
-        .padding(.trailing, 14)
+        .padding(.trailing, sideInset)
         .padding(.top, 11)
         .padding(.bottom, showsDetail ? 8 : 11)
     }
@@ -1205,7 +1253,7 @@ private struct IslandSessionRow: View {
                 .foregroundStyle(activityColor(for: presence).opacity(0.94))
                 .lineLimit(2)
                 .padding(.leading, detailLeadingInset)
-                .padding(.trailing, 16)
+                .padding(.trailing, sideInset)
                 .padding(.bottom, 10)
         }
 
@@ -1253,7 +1301,7 @@ private struct IslandSessionRow: View {
                 }
             }
             .padding(.leading, detailLeadingInset)
-            .padding(.trailing, 16)
+            .padding(.trailing, sideInset)
             .padding(.bottom, 10)
         }
 
@@ -1277,7 +1325,7 @@ private struct IslandSessionRow: View {
                 }
             }
             .padding(.leading, detailLeadingInset)
-            .padding(.trailing, 16)
+            .padding(.trailing, sideInset)
             .padding(.bottom, 10)
         }
     }
@@ -1320,22 +1368,22 @@ private struct IslandSessionRow: View {
     private var rowLeadingInset: CGFloat {
         switch stateIndicator {
         case .bar:
-            28
+            max(28, sideInset)
         case .tint:
-            16
+            sideInset
         case .animatedDot, .glyph:
-            16
+            sideInset
         }
     }
 
     private var detailLeadingInset: CGFloat {
         switch stateIndicator {
         case .bar:
-            28
+            max(28, sideInset)
         case .tint:
-            16
+            sideInset
         case .animatedDot, .glyph:
-            46
+            sideInset + 30
         }
     }
 

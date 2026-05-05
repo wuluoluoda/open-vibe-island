@@ -68,7 +68,7 @@ extension NotchShape {
     /// state no longer uses this shape — it renders via `V6ClosedPillShape`
     /// instead.
     static let openedTopRadius: CGFloat = 22
-    static let openedBottomRadius: CGFloat = 36
+    static let openedBottomRadius: CGFloat = 22
 
     static var opened: NotchShape {
         NotchShape(topCornerRadius: openedTopRadius, bottomCornerRadius: openedBottomRadius)
