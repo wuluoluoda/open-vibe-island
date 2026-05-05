@@ -135,6 +135,7 @@ struct AppearanceSettingsPane: View {
         VStack(alignment: .leading, spacing: 18) {
             partHeader(title: lang.t("settings.appearance.sessionListPart.title"))
             sessionListPreviewSection
+            usageDisplaySection
             stateIndicatorSection
             sessionGroupSection
             sessionSortSection
@@ -383,6 +384,29 @@ struct AppearanceSettingsPane: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - 02 · Usage
+
+    @ViewBuilder
+    private var usageDisplaySection: some View {
+        sectionHeader(
+            title: lang.t("settings.appearance.usageDisplay.title"),
+            note: lang.t("settings.appearance.usageDisplay.note")
+        )
+
+        HStack(spacing: 12) {
+            ForEach(IslandUsageDisplay.allCases) { option in
+                optionCard(
+                    selected: editingPreferences.usageDisplay == option,
+                    title: title(for: option)
+                ) {
+                    model.updateAppearancePreferences(for: editingProfile) { $0.usageDisplay = option }
+                } icon: {
+                    UsageDisplayPreview(option: option)
+                }
+            }
+        }
+    }
+
     // MARK: - 03 · Session state
 
     @ViewBuilder
@@ -578,6 +602,13 @@ struct AppearanceSettingsPane: View {
         case .bar:         lang.t("settings.appearance.stateIndicator.bar")
         case .glyph:       lang.t("settings.appearance.stateIndicator.glyph")
         case .tint:        lang.t("settings.appearance.stateIndicator.tint")
+        }
+    }
+
+    private func title(for option: IslandUsageDisplay) -> String {
+        switch option {
+        case .hidden:  lang.t("settings.appearance.usageDisplay.hidden")
+        case .compact: lang.t("settings.appearance.usageDisplay.compact")
         }
     }
 
@@ -1348,6 +1379,38 @@ private struct StateIndicatorPreview: View {
                 .fill(V6Palette.paper.opacity(0.72))
                 .frame(width: 10, height: 10)
         }
+    }
+}
+
+private struct UsageDisplayPreview: View {
+    let option: IslandUsageDisplay
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if option == .compact {
+                usageChip("Claude", value: 42, color: Color(hex: AgentTool.claudeCode.brandColorHex) ?? .orange)
+                usageChip("Cx", value: 13, color: Color(hex: AgentTool.codex.brandColorHex) ?? .blue)
+            } else {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(V6Palette.paper.opacity(0.18))
+                    .frame(width: 72, height: 5)
+            }
+        }
+        .frame(width: 104, alignment: .center)
+    }
+
+    private func usageChip(_ title: String, value: Int, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(V6Palette.paper.opacity(0.66))
+            Text("\(value)%")
+                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(.white.opacity(0.055), in: Capsule())
     }
 }
 

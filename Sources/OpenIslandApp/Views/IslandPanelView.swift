@@ -736,26 +736,19 @@ struct IslandPanelView: View {
 
         if providers.isEmpty == false {
             ViewThatFits(in: .horizontal) {
-                usageSummaryView(providers, layout: .full)
-                usageSummaryView(providers, layout: .compact)
-                usageSummaryView(providers, layout: .condensed)
-                usageSummaryView(providers, layout: .minimal)
+                compactUsageSummaryView(providers, usesShortTitles: false)
+                compactUsageSummaryView(providers, usesShortTitles: true)
             }
         } else {
-            HStack(spacing: 8) {
-                Text(model.lang.t("app.name"))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-
-                Text(model.lang.t("island.usageWaiting"))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
-            }
-            .lineLimit(1)
+            Color.clear
         }
     }
 
     private var openedUsageProviders: [UsageProviderPresentation] {
+        guard model.islandUsageDisplay == .compact else {
+            return []
+        }
+
         var providers: [UsageProviderPresentation] = []
 
         if let snapshot = model.claudeUsageSnapshot,
@@ -850,11 +843,8 @@ struct IslandPanelView: View {
                 .frame(maxWidth: .infinity)
         } else {
             ViewThatFits(in: .horizontal) {
-                usageSummaryView(providers, layout: .full)
-                usageSummaryView(providers, layout: .compact)
-                usageSummaryView(providers, layout: .condensed)
-                usageSummaryView(providers, layout: .minimal)
-                usageSummaryView(providers, layout: .micro)
+                compactUsageSummaryView(providers, usesShortTitles: false)
+                compactUsageSummaryView(providers, usesShortTitles: true)
             }
             .frame(maxWidth: .infinity, alignment: alignment)
         }
@@ -913,40 +903,17 @@ struct IslandPanelView: View {
         )
     }
 
-    private func usageSummaryView(
+    private func compactUsageSummaryView(
         _ providers: [UsageProviderPresentation],
-        layout: UsageSummaryLayout
+        usesShortTitles: Bool
     ) -> some View {
-        HStack(spacing: layout.providerSpacing) {
-            ForEach(Array(providers.enumerated()), id: \.element.id) { index, provider in
-                if index > 0 {
-                    usageSeparator(layout.providerSeparator, opacity: layout.providerSeparatorOpacity)
-                }
-
-                usageProviderView(provider, layout: layout)
+        HStack(spacing: 7) {
+            ForEach(providers) { provider in
+                compactUsageChip(provider, usesShortTitle: usesShortTitles)
             }
         }
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private func usageProviderView(
-        _ provider: UsageProviderPresentation,
-        layout: UsageSummaryLayout
-    ) -> some View {
-        HStack(spacing: 8) {
-            Text(layout.usesShortProviderTitle ? provider.shortTitle : provider.title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
-
-            ForEach(Array(layout.windows(from: provider).enumerated()), id: \.element.id) { index, window in
-                if index > 0 {
-                    usageSeparator(layout.windowSeparator, opacity: layout.windowSeparatorOpacity)
-                }
-
-                usageWindowView(window: window, layout: layout)
-            }
-        }
     }
 
     private func screenID(for screen: NSScreen) -> String {
@@ -958,35 +925,36 @@ struct IslandPanelView: View {
         return screen.localizedName
     }
 
-    private func usageWindowView(
-        window: UsageWindowPresentation,
-        layout: UsageSummaryLayout
-    ) -> some View {
-        HStack(spacing: 4) {
-            if layout.showsWindowLabel {
-                Text(window.label)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.55))
-            }
+    private func compactUsageChip(_ provider: UsageProviderPresentation, usesShortTitle: Bool) -> some View {
+        HStack(spacing: 5) {
+            Text(usesShortTitle ? provider.shortTitle : provider.title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.74))
 
-            Text("\(window.roundedUsedPercentage)%")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(usageColor(for: window.usedPercentage))
-
-            if layout.showsResetTime,
-               let resetsAt = window.resetsAt,
-               let remaining = remainingDurationString(until: resetsAt) {
-                Text(remaining)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
-            }
+            Text("\(provider.peakUsagePercentage)%")
+                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                .foregroundStyle(usageColor(for: provider.peakUsedPercentage))
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.white.opacity(0.055), in: Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(.white.opacity(0.06), lineWidth: 1)
+        )
+        .help(usageHelpText(for: provider))
     }
 
-    private func usageSeparator(_ title: String, opacity: Double) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.white.opacity(opacity))
+    private func usageHelpText(for provider: UsageProviderPresentation) -> String {
+        provider.windows.map { window in
+            var parts = ["\(window.label) \(window.roundedUsedPercentage)%"]
+            if let resetsAt = window.resetsAt,
+               let remaining = remainingDurationString(until: resetsAt) {
+                parts.append(remaining)
+            }
+            return parts.joined(separator: " ")
+        }
+        .joined(separator: " · ")
     }
 
     private func headerPill(_ title: String, tint: Color) -> some View {
@@ -1038,6 +1006,14 @@ private struct UsageProviderPresentation: Identifiable {
     let title: String
     let windows: [UsageWindowPresentation]
 
+    var peakUsedPercentage: Double {
+        windows.map(\.usedPercentage).max() ?? 0
+    }
+
+    var peakUsagePercentage: Int {
+        Int(peakUsedPercentage.rounded())
+    }
+
     var shortTitle: String {
         switch id {
         case "claude":
@@ -1058,85 +1034,6 @@ private struct UsageWindowPresentation: Identifiable {
 
     var roundedUsedPercentage: Int {
         Int(usedPercentage.rounded())
-    }
-}
-
-private enum UsageSummaryLayout {
-    case full
-    case compact
-    case condensed
-    case minimal
-    case micro
-
-    var showsResetTime: Bool {
-        switch self {
-        case .full:
-            true
-        case .compact, .condensed, .minimal, .micro:
-            false
-        }
-    }
-
-    var showsWindowLabel: Bool {
-        switch self {
-        case .full, .compact:
-            true
-        case .condensed, .minimal, .micro:
-            false
-        }
-    }
-
-    var usesShortProviderTitle: Bool {
-        self == .minimal || self == .micro
-    }
-
-    var providerSpacing: CGFloat {
-        switch self {
-        case .full, .compact:
-            8
-        case .condensed, .minimal, .micro:
-            6
-        }
-    }
-
-    var providerSeparator: String {
-        "|"
-    }
-
-    var providerSeparatorOpacity: Double {
-        switch self {
-        case .full, .compact:
-            0.2
-        case .condensed, .minimal, .micro:
-            0.12
-        }
-    }
-
-    var windowSeparator: String {
-        switch self {
-        case .full, .compact:
-            "|"
-        case .condensed, .minimal, .micro:
-            "/"
-        }
-    }
-
-    var windowSeparatorOpacity: Double {
-        switch self {
-        case .full, .compact:
-            0.16
-        case .condensed, .minimal, .micro:
-            0.28
-        }
-    }
-
-    func windows(from provider: UsageProviderPresentation) -> [UsageWindowPresentation] {
-        switch self {
-        case .micro:
-            Array(provider.windows.prefix(1))
-        case .full, .compact, .condensed, .minimal:
-            provider.windows
-        }
     }
 }
 

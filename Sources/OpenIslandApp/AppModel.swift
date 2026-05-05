@@ -350,6 +350,11 @@ final class AppModel {
         set { updateAppearancePreferences(for: activeAppearanceProfile) { $0.centerLabel = newValue } }
     }
 
+    var islandUsageDisplay: IslandUsageDisplay {
+        get { appearancePreferences(for: activeAppearanceProfile).usageDisplay }
+        set { updateAppearancePreferences(for: activeAppearanceProfile) { $0.usageDisplay = newValue } }
+    }
+
     var islandSessionStateIndicator: IslandSessionStateIndicator {
         get { appearancePreferences(for: activeAppearanceProfile).sessionStateIndicator }
         set { updateAppearancePreferences(for: activeAppearanceProfile) { $0.sessionStateIndicator = newValue } }
@@ -414,6 +419,7 @@ final class AppModel {
         let defaults = UserDefaults.standard
         defaults.set(preferences.rightSlot.rawValue, forKey: Self.appearanceDefaultsKey(profile, "rightSlot"))
         defaults.set(preferences.centerLabel.rawValue, forKey: Self.appearanceDefaultsKey(profile, "centerLabel"))
+        defaults.set(preferences.usageDisplay.rawValue, forKey: Self.appearanceDefaultsKey(profile, "usageDisplay"))
         defaults.set(preferences.sessionStateIndicator.rawValue, forKey: Self.appearanceDefaultsKey(profile, "stateIndicator"))
         defaults.set(preferences.sessionGroup.rawValue, forKey: Self.appearanceDefaultsKey(profile, "sessionGroup"))
         defaults.set(preferences.sessionSort.rawValue, forKey: Self.appearanceDefaultsKey(profile, "sessionSort"))
@@ -541,6 +547,10 @@ final class AppModel {
                     ?? defaults.string(forKey: islandCenterLabelDefaultsKey)
                     ?? ""
             ) ?? .agentAction,
+            usageDisplay: IslandUsageDisplay(
+                rawValue: defaults.string(forKey: appearanceDefaultsKey(profile, "usageDisplay"))
+                    ?? ""
+            ) ?? .compact,
             sessionStateIndicator: IslandSessionStateIndicator(
                 rawValue: defaults.string(forKey: appearanceDefaultsKey(profile, "stateIndicator"))
                     ?? defaults.string(forKey: legacyIslandSessionStateIndicatorDefaultsKey)
