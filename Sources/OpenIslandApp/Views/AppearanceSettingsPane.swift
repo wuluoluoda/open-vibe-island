@@ -1292,15 +1292,7 @@ private struct CountBadgePreview: View {
     var body: some View {
         Text("×\(count)")
             .font(.system(size: 12, weight: .semibold, design: .monospaced))
-            .foregroundStyle(V6Palette.paper)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                Capsule().fill(V6Palette.paper.opacity(0.14))
-            )
-            .overlay(
-                Capsule().stroke(V6Palette.paper.opacity(0.35), lineWidth: 1)
-            )
+            .foregroundStyle(V6Palette.paper.opacity(0.72))
     }
 }
 

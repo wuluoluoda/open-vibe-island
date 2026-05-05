@@ -38,15 +38,7 @@ struct V6RightSlotView: View {
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(V6Palette.paper)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule().fill(V6Palette.paper.opacity(0.14))
-                )
-                .overlay(
-                    Capsule().stroke(V6Palette.paper.opacity(0.32), lineWidth: 1)
-                )
+                .foregroundStyle(V6Palette.paper.opacity(0.72))
         case .agents(let cells):
             AgentsGridBody(cells: cells)
         }
@@ -60,8 +52,8 @@ struct V6RightSlotView: View {
         switch content {
         case .count(let n):
             let digits = Double(max(1, String(n).count))
-            // "×" + digits at 11pt mono ≈ 7.2pt/char + 14pt padding + 2pt stroke.
-            return CGFloat(30.0 + max(0.0, digits - 1.0) * 7.2)
+            // "×" + digits at 11pt mono ≈ 7.2pt/char.
+            return CGFloat(14.4 + max(0.0, digits - 1.0) * 7.2)
         case .agents(let cells):
             let n = cells.count
             guard n > 0 else { return 0 }
@@ -244,7 +236,7 @@ struct V6ClosedPill: View {
 
     // Minimum breathing room between the center label (or glyph, when no
     // label) and the right-slot content so they never touch at small widths.
-    private static let innerGap: CGFloat = 10
+    private static let innerGap: CGFloat = 6
 
     // MARK: External (fluid)
 
