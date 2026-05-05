@@ -1254,7 +1254,7 @@ private struct IslandSessionRow: View {
                     .truncationMode(.tail)
 
                 if showsDetail,
-                   let promptLine = session.spotlightPromptLineText ?? expandedPromptLineText {
+                   let promptLine = summaryPromptLineText {
                     Text(promptLine)
                         .font(.system(size: 11.2, weight: .medium))
                         .foregroundStyle(summaryPromptColor(for: presence))
@@ -1393,6 +1393,14 @@ private struct IslandSessionRow: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(.white.opacity(presentation == .notification ? 0.045 : 0.06), in: Capsule())
+    }
+
+    private var summaryPromptLineText: String? {
+        if presentation == .notification {
+            return session.notificationHeaderPromptLineText
+        }
+
+        return session.spotlightPromptLineText ?? expandedPromptLineText
     }
 
     private var agentBadgeTitle: String {
@@ -1633,10 +1641,19 @@ private struct IslandSessionRow: View {
     private var completionActionBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                Text(completionPromptLabel)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(.white.opacity(completionPromptOpacity))
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(completionContextTitle)
+                        .font(.system(size: 12.2, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(completionPromptOpacity))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(completionContextSubtitle)
+                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(completionSubtitleOpacity))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
 
                 Spacer(minLength: 8)
 
@@ -1680,7 +1697,11 @@ private struct IslandSessionRow: View {
     }
 
     private var completionPromptOpacity: Double {
-        presentation == .notification ? 0.62 : 0.8
+        presentation == .notification ? 0.56 : 0.68
+    }
+
+    private var completionSubtitleOpacity: Double {
+        presentation == .notification ? 0.38 : 0.48
     }
 
     private var completionDoneOpacity: Double {
@@ -1733,11 +1754,26 @@ private struct IslandSessionRow: View {
 
     // MARK: - Actionable helpers
 
-    private var completionPromptLabel: String {
-        if let prompt = session.latestUserPromptText?.trimmedForNotificationCard, !prompt.isEmpty {
-            return "You: \(prompt)"
+    private var completionContextTitle: String {
+        let workspace = session.spotlightWorkspaceName.trimmedForNotificationCard
+        let title = workspace.isEmpty ? session.title.trimmedForNotificationCard : workspace
+        guard let branch = session.spotlightWorktreeBranch?.trimmedForNotificationCard,
+              !branch.isEmpty,
+              branch != "main" else {
+            return title.isEmpty ? session.tool.displayName : title
         }
-        return session.summary.trimmedForNotificationCard.isEmpty ? "You" : "You:"
+
+        return "\(title) · \(branch)"
+    }
+
+    private var completionContextSubtitle: String {
+        let age = session.spotlightAgeBadge
+        if let terminal = session.spotlightTerminalBadge?.trimmedForNotificationCard,
+           !terminal.isEmpty {
+            return "\(session.tool.displayName) · \(terminal) · \(age)"
+        }
+
+        return "\(session.tool.displayName) · \(age)"
     }
 
     private var completionMessageText: String {
