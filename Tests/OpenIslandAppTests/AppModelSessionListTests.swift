@@ -988,6 +988,84 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func codexShelfCanBeDisabledViaFeatureToggle() throws {
+        let now = Date(timeIntervalSince1970: 3_975)
+        let model = AppModel()
+        let fileManager = FileManager.default
+
+        let workspaceURL = fileManager.temporaryDirectory
+            .appendingPathComponent("open-island-shelf-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: workspaceURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: workspaceURL) }
+
+        let fileURL = workspaceURL.appendingPathComponent("main.swift")
+        try "print(\"hello\")".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        var session = AgentSession(
+            id: "codex-shelf-toggle",
+            title: "Codex · shelf-project",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Working on docs",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "shelf-project",
+                paneTitle: "codex ~/shelf-project",
+                workingDirectory: workspaceURL.path
+            )
+        )
+        session.isProcessAlive = true
+        model.state = SessionState(sessions: [session])
+
+        model.applyTrackedEvent(
+            .activityUpdated(
+                SessionActivityUpdated(
+                    sessionID: session.id,
+                    summary: "Updated main.swift",
+                    phase: .running,
+                    timestamp: now.addingTimeInterval(1)
+                )
+            )
+        )
+
+        #expect(model.codexShelfItems.count == 1)
+        model.codexShelfEnabled = false
+        #expect(model.codexShelfItems.isEmpty)
+    }
+
+    @Test
+    func codexRadarCanBeDisabledViaFeatureToggle() {
+        let now = Date(timeIntervalSince1970: 3_990)
+        let model = AppModel()
+
+        var session = AgentSession(
+            id: "codex-radar-toggle",
+            title: "Codex · radar-repo",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Running radar task",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "radar-repo",
+                paneTitle: "codex ~/radar-repo",
+                workingDirectory: "/tmp/radar-repo"
+            )
+        )
+        session.isProcessAlive = true
+        model.state = SessionState(sessions: [session])
+
+        #expect(model.codexRadarProjects.count == 1)
+        model.codexRadarEnabled = false
+        #expect(model.codexRadarProjects.isEmpty)
+    }
+
+    @Test
     func codexRadarAggregatesByProjectAndPrioritizesActionableProject() {
         let now = Date(timeIntervalSince1970: 4_000)
         let model = AppModel()

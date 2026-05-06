@@ -79,6 +79,34 @@ struct CodexOperationalStatusTests {
     }
 
     @Test
+    func connectingStatusUsesBridgeSignalForLiveSessions() {
+        let now = Date(timeIntervalSince1970: 20_000)
+        var session = AgentSession(
+            id: "codex-1",
+            title: "Codex · repo",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Running",
+            updatedAt: now
+        )
+        session.isProcessAlive = true
+
+        let signals = CodexOperationalStatusSignals(
+            now: now,
+            bridgeConnectionState: .connecting,
+            codexAppServerConnectionState: .connected,
+            stalledThreshold: 12 * 60,
+            loopSuspectedEnabled: false,
+            loopRepeatCount: 0,
+            loopSuspectedThreshold: 4,
+            recentCompletionWindow: 20 * 60
+        )
+        #expect(session.codexOperationalStatus(signals: signals) == .connecting)
+    }
+
+    @Test
     func loopSuspectedRespectsThresholdAndSwitch() {
         let now = Date(timeIntervalSince1970: 20_000)
         var session = AgentSession(
