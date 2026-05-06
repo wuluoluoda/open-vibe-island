@@ -1191,7 +1191,7 @@ private struct IslandSessionRow: View {
         .animation(.easeInOut(duration: 0.15), value: isHighlighted)
         .onTapGesture(perform: handlePrimaryTap)
         .onHover { hovering in
-            guard isInteractive else { return }
+            guard isInteractive, allowsRowHoverHighlight else { return }
             isHighlighted = hovering
         }
         .onChange(of: isInteractive) { _, interactive in
@@ -1843,7 +1843,7 @@ private struct IslandSessionRow: View {
 
     private func rowFillColor(for presence: IslandSessionPresence) -> Color {
         if presentation == .notification {
-            return isHighlighted ? Color.white.opacity(0.03) : Color.clear
+            return Color.clear
         }
 
         let base = isHighlighted ? Color.white.opacity(isActionable ? 0.06 : 0.04) : Color.clear
@@ -1869,6 +1869,10 @@ private struct IslandSessionRow: View {
         case .completed:
             "checkmark.circle.fill"
         }
+    }
+
+    private var allowsRowHoverHighlight: Bool {
+        presentation != .notification
     }
 
     /// Prompt line for manually expanded inactive rows (bypasses time-based filter).
@@ -1976,6 +1980,7 @@ private struct StructuredQuestionPromptView: View {
     @State private var selections: [String: Set<String>] = [:]
     @State private var freeformTexts: [String: String] = [:]
     @State private var typedReply: String = ""
+    @State private var hoveredOptionKey: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -2051,6 +2056,8 @@ private struct StructuredQuestionPromptView: View {
         question: QuestionPromptItem
     ) -> some View {
         let isSelected = selectedLabels(for: question).contains(option.label)
+        let key = optionKey(for: question, option: option)
+        let isHovered = hoveredOptionKey == key
         let showsFreeform = option.allowsFreeform && isSelected
         VStack(alignment: .leading, spacing: 0) {
             Button {
@@ -2078,7 +2085,7 @@ private struct StructuredQuestionPromptView: View {
                         if !option.description.isEmpty {
                             Text(option.description)
                                 .font(.system(size: 10.5))
-                                .foregroundStyle(.white.opacity(0.4))
+                                .foregroundStyle(.white.opacity(isHovered || isSelected ? 0.48 : 0.38))
                                 .lineLimit(1)
                         }
                     }
@@ -2105,12 +2112,17 @@ private struct StructuredQuestionPromptView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? V6Palette.paper.opacity(0.10) : Color.white.opacity(0.028))
+                .fill(optionFillColor(isSelected: isSelected, isHovered: isHovered))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(isSelected ? V6Palette.paper.opacity(0.36) : .white.opacity(0.045))
+                .strokeBorder(optionStrokeColor(isSelected: isSelected, isHovered: isHovered))
         )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                hoveredOptionKey = hovering ? key : (hoveredOptionKey == key ? nil : hoveredOptionKey)
+            }
+        }
     }
 
     @ViewBuilder
@@ -2313,6 +2325,30 @@ private struct StructuredQuestionPromptView: View {
 
     private func freeformKey(for question: QuestionPromptItem, option: QuestionOption) -> String {
         "\(question.question)|\(option.label)"
+    }
+
+    private func optionKey(for question: QuestionPromptItem, option: QuestionOption) -> String {
+        "\(question.question)|\(option.label)"
+    }
+
+    private func optionFillColor(isSelected: Bool, isHovered: Bool) -> Color {
+        if isSelected {
+            return V6Palette.paper.opacity(0.10)
+        }
+        if isHovered {
+            return Color.white.opacity(0.065)
+        }
+        return Color.white.opacity(0.028)
+    }
+
+    private func optionStrokeColor(isSelected: Bool, isHovered: Bool) -> Color {
+        if isSelected {
+            return V6Palette.paper.opacity(0.36)
+        }
+        if isHovered {
+            return .white.opacity(0.13)
+        }
+        return .white.opacity(0.045)
     }
 
     private func trimmedFreeform(for question: QuestionPromptItem, option: QuestionOption) -> String {
