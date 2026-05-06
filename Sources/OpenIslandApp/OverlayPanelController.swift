@@ -588,28 +588,42 @@ final class OverlayPanelController {
     /// Estimates the question card height based on prompt content (question count,
     /// option count per question, and whether the prompt title is shown).
     private func questionCardHeight(for prompt: QuestionPrompt?) -> CGFloat {
-        guard let prompt, !prompt.questions.isEmpty else {
+        guard let prompt else {
             return Self.questionCardBaseHeight
         }
 
-        // Card chrome: outer padding + submit button ≈ 90pt.
+        let questions = prompt.questions.isEmpty && !prompt.options.isEmpty
+            ? [
+                QuestionPromptItem(
+                    question: prompt.title,
+                    header: "",
+                    options: prompt.options.map { QuestionOption(label: $0) }
+                ),
+            ]
+            : prompt.questions
+
+        guard !questions.isEmpty else {
+            return Self.questionCardBaseHeight
+        }
+
+        // Card chrome: outer padding + submit button.
         // When the prompt title is suppressed (single question whose title
-        // matches the question text), reduce chrome by ~20pt.
-        let titleSuppressed = prompt.questions.count == 1
-            && prompt.title == prompt.questions.first?.question
-        let chromeHeight: CGFloat = titleSuppressed ? 70 : 90
+        // matches the question text), reduce chrome because the body carries it.
+        let titleSuppressed = questions.count == 1
+            && prompt.title == questions.first?.question
+        let chromeHeight: CGFloat = titleSuppressed ? 82 : 102
         var contentHeight: CGFloat = 0
 
-        for question in prompt.questions {
-            if prompt.questions.count > 1 {
+        for question in questions {
+            if questions.count > 1 {
                 contentHeight += 16 // header
             }
             contentHeight += 20 // question text
-            contentHeight += CGFloat(question.options.count) * 30 // option rows
+            contentHeight += CGFloat(question.options.count) * 38 // option rows
         }
 
         // Inter-question spacing (only between questions, not after the last).
-        contentHeight += CGFloat(max(0, prompt.questions.count - 1)) * 10
+        contentHeight += CGFloat(max(0, questions.count - 1)) * 10
 
         let estimated = chromeHeight + contentHeight
         return min(Self.questionCardMaxHeight, max(Self.questionCardBaseHeight, estimated))

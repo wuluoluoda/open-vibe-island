@@ -1595,6 +1595,7 @@ private struct IslandSessionRow: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -1996,14 +1997,11 @@ private struct StructuredQuestionPromptView: View {
 
                 quickReplyField
 
-                HStack {
-                    Spacer(minLength: 0)
-                    Button(submitButtonTitle) {
-                        submitAnswer()
-                    }
-                    .buttonStyle(IslandActionButtonStyle(kind: canSubmit ? .primary : .secondary))
-                    .disabled(!canSubmit)
+                Button(submitButtonTitle) {
+                    submitAnswer()
                 }
+                .buttonStyle(IslandActionButtonStyle(kind: canSubmit ? .primary : .secondary, expands: true))
+                .disabled(!canSubmit)
             }
         }
         .padding(.horizontal, 10)
@@ -2011,11 +2009,11 @@ private struct StructuredQuestionPromptView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.04))
+                .fill(Color.white.opacity(0.03))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.white.opacity(0.06))
+                .strokeBorder(.white.opacity(0.05))
         )
     }
 
@@ -2094,7 +2092,7 @@ private struct StructuredQuestionPromptView: View {
                     }
                 }
                 .contentShape(Rectangle())
-                .padding(.vertical, 7)
+                .padding(.vertical, 5)
                 .padding(.horizontal, 11)
             }
             .buttonStyle(.plain)
@@ -2106,12 +2104,12 @@ private struct StructuredQuestionPromptView: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isSelected ? V6Palette.paper.opacity(0.10) : Color.white.opacity(0.04))
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? V6Palette.paper.opacity(0.10) : Color.white.opacity(0.028))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(isSelected ? V6Palette.paper.opacity(0.36) : .white.opacity(0.055))
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(isSelected ? V6Palette.paper.opacity(0.36) : .white.opacity(0.045))
         )
     }
 
@@ -2139,40 +2137,40 @@ private struct StructuredQuestionPromptView: View {
         VStack(alignment: .leading, spacing: 8) {
             quickReplyField
 
-            HStack {
-                Spacer(minLength: 0)
-                Button(lang.t("question.submit")) {
-                    submitAnswer()
-                }
-                .buttonStyle(IslandActionButtonStyle(kind: canSubmit ? .primary : .secondary))
-                .disabled(!canSubmit)
+            Button(lang.t("question.submit")) {
+                submitAnswer()
             }
+            .buttonStyle(IslandActionButtonStyle(kind: canSubmit ? .primary : .secondary, expands: true))
+            .disabled(!canSubmit)
         }
     }
 
+    @ViewBuilder
     private var quickReplyField: some View {
-        HStack(spacing: 6) {
-            ReplyTextField(
-                placeholder: lang.t("question.otherPlaceholder"),
-                text: $typedReply,
-                onSubmit: {
-                    if canSubmit {
-                        submitAnswer()
+        if showsGlobalReplyField {
+            HStack(spacing: 6) {
+                ReplyTextField(
+                    placeholder: lang.t("question.otherPlaceholder"),
+                    text: $typedReply,
+                    onSubmit: {
+                        if canSubmit {
+                            submitAnswer()
+                        }
                     }
-                }
+                )
+                .frame(height: 30)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.035))
             )
-            .frame(height: 30)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(.white.opacity(0.055))
+            )
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.white.opacity(0.06))
-        )
     }
 
     // MARK: - Helpers
@@ -2224,6 +2222,12 @@ private struct StructuredQuestionPromptView: View {
 
     private var trimmedReply: String {
         typedReply.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var showsGlobalReplyField: Bool {
+        structuredQuestions.isEmpty || !structuredQuestions.contains { question in
+            question.options.contains { $0.allowsFreeform }
+        }
     }
 
     private var primarySelectedAnswer: String? {
@@ -2441,9 +2445,11 @@ private struct IslandActionButtonStyle: ButtonStyle {
     let kind: Kind
     var expands = false
 
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11.5, weight: .semibold))
+            .font(.system(size: 11.8, weight: .semibold))
             .foregroundStyle(foregroundColor)
             .lineLimit(1)
             .frame(maxWidth: expands ? .infinity : nil)
@@ -2458,6 +2464,10 @@ private struct IslandActionButtonStyle: ButtonStyle {
     }
 
     private var foregroundColor: Color {
+        guard isEnabled else {
+            return V6Palette.paper.opacity(0.42)
+        }
+
         switch kind {
         case .primary:
             return .black.opacity(0.88)
@@ -2469,6 +2479,10 @@ private struct IslandActionButtonStyle: ButtonStyle {
     }
 
     private var strokeColor: Color {
+        guard isEnabled else {
+            return .white.opacity(0.07)
+        }
+
         switch kind {
         case .primary:
             return V6Palette.paper.opacity(0.86)
@@ -2480,6 +2494,10 @@ private struct IslandActionButtonStyle: ButtonStyle {
     }
 
     private func backgroundColor(_ isPressed: Bool) -> Color {
+        guard isEnabled else {
+            return Color.white.opacity(0.055)
+        }
+
         let pressedFactor: Double = isPressed ? 0.78 : 1
         switch kind {
         case .primary:
