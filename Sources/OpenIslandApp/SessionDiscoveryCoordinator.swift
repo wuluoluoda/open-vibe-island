@@ -414,9 +414,9 @@ final class SessionDiscoveryCoordinator {
             !existingIDs.contains(record.sessionID)
                 && (record.codexMetadata?.transcriptPath).map { !existingPaths.contains($0) } ?? true
         }
-        guard !newRecords.isEmpty else { return }
+        guard !records.isEmpty else { return }
 
-        let newSessions = newRecords.map { record -> AgentSession in
+        let discoveredSessions = records.map { record -> AgentSession in
             var session = record.session
             session.isCodexAppSession = true
             session.isProcessAlive = true
@@ -438,11 +438,13 @@ final class SessionDiscoveryCoordinator {
             return session
         }
 
-        let merged = mergeDiscoveredSessions(newSessions)
+        let merged = mergeDiscoveredSessions(discoveredSessions)
         state = SessionState(sessions: merged)
         refreshCodexRolloutTracking()
         scheduleCodexSessionPersistence()
-        onStatusMessage?("Discovered \(newRecords.count) new Codex.app session(s) via rollout re-scan.")
+        if !newRecords.isEmpty {
+            onStatusMessage?("Discovered \(newRecords.count) new Codex.app session(s) via rollout re-scan.")
+        }
     }
 
     // MARK: - Persistence scheduling

@@ -72,8 +72,8 @@ final class CodexAppServerCoordinator {
 
                 self.onStatusMessage?("Connected to Codex app-server.")
 
-                // Fetch currently loaded threads and create sessions.
-                await self.syncLoadedThreads()
+                // Fetch currently live threads and create sessions.
+                await self.syncCurrentThreads()
             } catch {
                 self.connectTask = nil
                 self.onStatusMessage?("Failed to connect to Codex app-server: \(error.localizedDescription)")
@@ -92,10 +92,10 @@ final class CodexAppServerCoordinator {
 
     // MARK: - Thread sync
 
-    private func syncLoadedThreads() async {
+    private func syncCurrentThreads() async {
         guard let client else { return }
         do {
-            let threads = try await client.listLoadedThreads()
+            let threads = try await currentThreads(from: client)
             var created = 0
             for thread in threads where !thread.ephemeral {
                 // Skip threads already tracked — re-emitting sessionStarted
@@ -109,7 +109,29 @@ final class CodexAppServerCoordinator {
                 onStatusMessage?("Synced \(created) new Codex thread(s) from app-server.")
             }
         } catch {
-            onStatusMessage?("Failed to list loaded Codex threads: \(error.localizedDescription)")
+            onStatusMessage?("Failed to list current Codex threads: \(error.localizedDescription)")
+        }
+    }
+
+    private func currentThreads(from client: CodexAppServerClient) async throws -> [CodexThread] {
+        let loadedThreads = try await client.listLoadedThreads()
+        let allThreads = (try? await client.listThreads(limit: 120)) ?? []
+        var threadsByID: [String: CodexThread] = [:]
+
+        for thread in loadedThreads where !thread.ephemeral {
+            threadsByID[thread.id] = thread
+        }
+
+        for thread in allThreads where !thread.ephemeral && thread.status.type == .active {
+            threadsByID[thread.id] = thread
+        }
+
+        return threadsByID.values.sorted { lhs, rhs in
+            if lhs.status.type == rhs.status.type {
+                return lhs.updatedAt > rhs.updatedAt
+            }
+
+            return lhs.status.type == .active
         }
     }
 
@@ -229,8 +251,12 @@ final class CodexAppServerCoordinator {
     // MARK: - Helpers
 
     private func emitSessionStarted(from thread: CodexThread) {
-        let workspaceName = URL(fileURLWithPath: thread.cwd).lastPathComponent
-        let title = thread.name ?? workspaceName
+        let workspaceName = CodexSessionDisplayResolver.workspaceName(for: thread.cwd)
+        let title = CodexSessionDisplayResolver.sessionTitle(
+            cwd: thread.cwd,
+            threadName: thread.name,
+            sessionID: thread.id
+        )
         let summary = thread.preview.isEmpty ? "Codex session." : String(thread.preview.prefix(120))
 
         let phase: SessionPhase

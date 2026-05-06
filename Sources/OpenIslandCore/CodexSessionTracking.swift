@@ -231,12 +231,11 @@ public final class CodexRolloutDiscovery: @unchecked Sendable {
         var timestamp: Date?
 
         var workspaceName: String {
-            let workspace = URL(fileURLWithPath: cwd).lastPathComponent
-            return workspace.isEmpty ? "Workspace" : workspace
+            CodexSessionDisplayResolver.workspaceName(for: cwd)
         }
 
         var sessionTitle: String {
-            "Codex · \(workspaceName)"
+            CodexSessionDisplayResolver.sessionTitle(cwd: cwd, sessionID: sessionID)
         }
 
         var defaultSummary: String {
@@ -645,6 +644,12 @@ public enum CodexRolloutReducer {
                 }
 
                 applyAssistantMessage(message, timestamp: timestamp, to: &snapshot)
+            case "developer":
+                guard let objective = developerObjectiveText(from: payload) else {
+                    return
+                }
+
+                applyUserMessage(objective, timestamp: timestamp, to: &snapshot)
             default:
                 return
             }
@@ -786,6 +791,64 @@ public enum CodexRolloutReducer {
         }
 
         return clipped(segments.joined(separator: " "))
+    }
+
+    private static func developerObjectiveText(from payload: [String: Any]) -> String? {
+        guard let text = rawResponseMessageText(from: payload, textType: "input_text"),
+              let objective = untrustedObjectiveText(from: text) else {
+            return nil
+        }
+
+        return clipped(objective)
+    }
+
+    private static func rawResponseMessageText(
+        from payload: [String: Any],
+        textType: String
+    ) -> String? {
+        guard let content = payload["content"] as? [[String: Any]] else {
+            return nil
+        }
+
+        let segments = content.compactMap { item -> String? in
+            guard item["type"] as? String == textType,
+                  let text = item["text"] as? String else {
+                return nil
+            }
+
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        guard !segments.isEmpty else {
+            return nil
+        }
+
+        return segments.joined(separator: "\n")
+    }
+
+    private static func untrustedObjectiveText(from text: String) -> String? {
+        guard let startRange = text.range(of: "<untrusted_objective>"),
+              let endRange = text.range(of: "</untrusted_objective>", range: startRange.upperBound..<text.endIndex) else {
+            return nil
+        }
+
+        let objectiveBlock = String(text[startRange.upperBound..<endRange.lowerBound])
+        let lines = objectiveBlock
+            .split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        for line in lines {
+            if let range = line.range(of: "目标：") ?? line.range(of: "Goal:") {
+                let value = String(line[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty {
+                    return value
+                }
+            }
+        }
+
+        return lines.first
     }
 
     private static func isInjectedPromptBlock(_ text: String) -> Bool {

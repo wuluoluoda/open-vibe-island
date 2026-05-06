@@ -110,6 +110,27 @@ struct CodexSessionTrackingTests {
     }
 
     @Test
+    func codexDisplayResolverIgnoresRawSessionIDs() {
+        let cwd = "/Users/wuluoluo/Documents/open-vibe-island"
+        let sessionID = "019dfd62-6175-7341-9560-f0d780c8c809"
+
+        #expect(
+            CodexSessionDisplayResolver.sessionTitle(
+                cwd: cwd,
+                threadName: sessionID,
+                sessionID: sessionID
+            ) == "Codex · open-vibe-island"
+        )
+        #expect(
+            CodexSessionDisplayResolver.sessionTitle(
+                cwd: cwd,
+                threadName: "Refactor Codex detection",
+                sessionID: sessionID
+            ) == "Refactor Codex detection"
+        )
+    }
+
+    @Test
     func codexSessionStoreLoadsLegacyRecordsWithoutAttachmentState() throws {
         let rootURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("open-island-legacy-tracking-\(UUID().uuidString)", isDirectory: true)
@@ -219,6 +240,39 @@ struct CodexSessionTrackingTests {
         #expect(finalEvents.contains(where: { $0.trackedSessionCompletion?.isInterrupt != true }))
         #expect(finalEvents.contains(where: { $0.trackedMetadataUpdate?.codexMetadata.currentTool == nil }))
         #expect(finalEvents.contains(where: { $0.trackedMetadataUpdate?.codexMetadata.currentCommandPreview == nil }))
+    }
+
+    @Test
+    func codexRolloutReducerUsesContinuedGoalObjectiveAsPrompt() {
+        let snapshot = CodexRolloutReducer.snapshot(for: [
+            rolloutLine(
+                timestamp: "2026-05-06T13:00:34.378Z",
+                type: "response_item",
+                payload: [
+                    "type": "message",
+                    "role": "developer",
+                    "content": [
+                        [
+                            "type": "input_text",
+                            "text": """
+                            Continue working toward the active thread goal.
+
+                            <untrusted_objective>
+                            目标：把黑马点评前端改造成一个视觉非常炫酷、现代、有质感的前端，同时保证所有现有功能继续正常跑通。
+
+                            要求：
+                            1. 重点改前端页面，不要破坏后端接口。
+                            </untrusted_objective>
+                            """,
+                        ],
+                    ],
+                ]
+            ),
+        ])
+
+        #expect(snapshot.initialUserPrompt == "把黑马点评前端改造成一个视觉非常炫酷、现代、有质感的前端，同时保证所有现有功能继续正常跑通。")
+        #expect(snapshot.lastUserPrompt == "把黑马点评前端改造成一个视觉非常炫酷、现代、有质感的前端，同时保证所有现有功能继续正常跑通。")
+        #expect(snapshot.summary == "Prompt: 把黑马点评前端改造成一个视觉非常炫酷、现代、有质感的前端，同时保证所有现有功能继续正常跑通。")
     }
 
     @Test

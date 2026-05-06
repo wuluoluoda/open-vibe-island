@@ -123,8 +123,7 @@ struct AgentSessionPresentationTests {
             )
         )
 
-        // Headline uses initial prompt (session topic), prompt line uses latest
-        #expect(session.spotlightHeadlineText == "worktree · Start by fixing the island hover behavior.")
+        #expect(session.spotlightHeadlineText == "worktree · Now make the overlay height fit the content.")
         #expect(session.spotlightPromptLineText == "You: Now make the overlay height fit the content.")
     }
 

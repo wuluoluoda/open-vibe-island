@@ -162,9 +162,11 @@ extension AgentSession {
     }
 
     var spotlightHeadlinePromptText: String? {
-        // Headline shows the initial prompt (session topic), not the latest.
-        // The latest prompt is shown separately in the "You:" line.
-        initialPromptText ?? latestPromptText
+        if prefersLivePromptHeadline {
+            return latestPromptText ?? initialPromptText
+        }
+
+        return initialPromptText ?? latestPromptText
     }
 
     var spotlightPromptText: String? {

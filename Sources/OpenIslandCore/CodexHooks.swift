@@ -268,14 +268,14 @@ public extension CodexHookPayload {
     }
 
     var sessionTitle: String {
-        "Codex · \(workspaceName)"
+        CodexSessionDisplayResolver.sessionTitle(cwd: cwd, sessionID: sessionID)
     }
 
     var defaultJumpTarget: JumpTarget {
         JumpTarget(
             terminalApp: terminalApp ?? "Unknown",
             workspaceName: workspaceName,
-            paneTitle: terminalTitle ?? "Codex \(sessionID.prefix(8))",
+            paneTitle: terminalTitle ?? CodexSessionDisplayResolver.paneTitle(cwd: cwd, sessionID: sessionID),
             workingDirectory: cwd,
             terminalSessionID: terminalSessionID,
             terminalTTY: terminalTTY,
