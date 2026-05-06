@@ -20,7 +20,6 @@ final class OverlayPanelController {
     private static let codexPanelVerticalPadding: CGFloat = 20
     private static let codexPanelHeaderContentSpacing: CGFloat = 8
     private static let codexPanelInnerRowSpacing: CGFloat = 6
-    private static let codexRadarProjectRowHeight: CGFloat = 82
     private static let codexShelfProjectBaseHeight: CGFloat = 44
     private static let codexShelfItemRowHeight: CGFloat = 22
     // Content padding top (8) + scroll padding (4) + outerBottomPadding (14) + header-content gap (12)
@@ -613,19 +612,10 @@ final class OverlayPanelController {
                 + Self.codexPanelHeaderContentSpacing
                 + shelfProjectsHeight(for: shelfProjects)
 
-        let radarProjects = model.codexRadarProjects(at: date)
-        let radarHeight = radarProjects.isEmpty
-            ? CGFloat.zero
-            : Self.codexPanelVerticalPadding
-                + Self.codexPanelHeaderHeight
-                + Self.codexPanelHeaderContentSpacing
-                + CGFloat(radarProjects.count) * Self.codexRadarProjectRowHeight
-                + CGFloat(max(0, radarProjects.count - 1)) * Self.codexPanelInnerRowSpacing
-
-        let visiblePanelCount = [shelfHeight, radarHeight].filter { $0 > 0 }.count
+        let visiblePanelCount = shelfHeight > 0 ? 1 : 0
         let panelSpacing = CGFloat(visiblePanelCount) * Self.codexPanelSpacing
 
-        return shelfHeight + radarHeight + panelSpacing
+        return shelfHeight + panelSpacing
     }
 
     private func shelfProjectsHeight(for projects: [AppModel.CodexShelfProject]) -> CGFloat {

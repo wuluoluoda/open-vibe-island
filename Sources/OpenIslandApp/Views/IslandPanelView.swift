@@ -531,10 +531,6 @@ struct IslandPanelView: View {
                 if !model.codexShelfProjects.isEmpty {
                     codexShelfPanel(referenceDate: referenceDate)
                 }
-                let radarProjects = model.codexRadarProjects(at: referenceDate)
-                if !radarProjects.isEmpty {
-                    codexRadarPanel(projects: radarProjects, referenceDate: referenceDate)
-                }
                 sessionList(referenceDate: referenceDate)
             }
         }

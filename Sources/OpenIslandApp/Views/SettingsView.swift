@@ -228,11 +228,6 @@ struct GeneralSettingsPane: View {
             }
 
             Section {
-                Toggle(lang.t("settings.general.codexRadarView"), isOn: Binding(
-                    get: { model.codexRadarEnabled },
-                    set: { model.codexRadarEnabled = $0 }
-                ))
-
                 Toggle(lang.t("settings.general.codexShelf"), isOn: Binding(
                     get: { model.codexShelfEnabled },
                     set: { model.codexShelfEnabled = $0 }
