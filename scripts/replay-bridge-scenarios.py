@@ -3,8 +3,9 @@
 Replay bridge events into a running Open Island dev app.
 
 This is a manual UI verification helper.  It sends realistic bridge commands
-over the same Unix socket used by hook clients, but permission/question events
-are fire-and-forget so the script does not block while the UI waits for input.
+over the same Unix socket used by hook clients.  Permission/question events keep
+their socket open by default, matching real blocking hook/plugin processes while
+the UI waits for user input.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from typing import Any
 
 SCENARIOS = ("approval", "question", "completion", "all")
 DEFAULT_FIRE_AND_FORGET_PAUSE = 0.15
+DEFAULT_HOLD_TIMEOUT = 0.0
 
 
 def default_socket_path() -> str:
@@ -115,7 +117,7 @@ def process_opencode_hook(payload: dict[str, Any]) -> dict[str, Any]:
     return command_envelope({"type": "processOpenCodeHook", "openCodeHook": payload})
 
 
-def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any], bool]]:
+def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any], bool, bool]]:
     if scenario == "approval":
         session_id = "open-island-replay-approval"
         return [
@@ -123,6 +125,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                 "codex session start",
                 process_codex_hook(codex_payload("SessionStart", session_id, cwd=cwd)),
                 True,
+                False,
             ),
             (
                 "codex prompt",
@@ -135,6 +138,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                     )
                 ),
                 True,
+                False,
             ),
             (
                 "codex approval request",
@@ -148,6 +152,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                     )
                 ),
                 False,
+                True,
             ),
         ]
 
@@ -158,6 +163,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                 "opencode session start",
                 process_opencode_hook(opencode_payload("SessionStart", session_id, cwd=cwd)),
                 True,
+                False,
             ),
             (
                 "opencode prompt",
@@ -170,6 +176,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                     )
                 ),
                 True,
+                False,
             ),
             (
                 "opencode question",
@@ -182,6 +189,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                     )
                 ),
                 False,
+                True,
             ),
         ]
 
@@ -192,6 +200,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                 "codex session start",
                 process_codex_hook(codex_payload("SessionStart", session_id, cwd=cwd)),
                 True,
+                False,
             ),
             (
                 "codex prompt",
@@ -204,6 +213,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                     )
                 ),
                 True,
+                False,
             ),
             (
                 "codex stop",
@@ -219,27 +229,52 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                     )
                 ),
                 True,
+                False,
             ),
         ]
 
     raise ValueError(f"unsupported scenario: {scenario}")
 
 
-def recv_response(sock: socket.socket, timeout: float) -> dict[str, Any] | None:
+def recv_response(sock: socket.socket, timeout: float | None) -> dict[str, Any] | None:
     sock.settimeout(timeout)
     buffer = b""
-    while True:
-        chunk = sock.recv(8192)
-        if not chunk:
-            return None
-        buffer += chunk
-        while b"\n" in buffer:
-            line, buffer = buffer.split(b"\n", 1)
-            if not line:
-                continue
-            message = json.loads(line)
-            if message.get("type") == "response":
-                return message.get("response")
+    try:
+        while True:
+            chunk = sock.recv(8192)
+            if not chunk:
+                return None
+            buffer += chunk
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                if not line:
+                    continue
+                message = json.loads(line)
+                if message.get("type") == "response":
+                    return message.get("response")
+    except (TimeoutError, socket.timeout):
+        return None
+
+
+def connect_bridge(socket_path: str) -> socket.socket:
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.connect(socket_path)
+    except FileNotFoundError:
+        sock.close()
+        raise RuntimeError(
+            f"Bridge socket not found at {socket_path}. Start the dev app with `zsh scripts/launch-dev-app.sh`."
+        )
+    except ConnectionRefusedError:
+        sock.close()
+        raise RuntimeError(
+            f"Bridge socket refused connection at {socket_path}. Restart the dev app and try again."
+        )
+    return sock
+
+
+def encode_envelope(envelope: dict[str, Any]) -> str:
+    return json.dumps(envelope, separators=(",", ":"))
 
 
 def send_envelope(
@@ -250,23 +285,12 @@ def send_envelope(
     timeout: float,
     dry_run: bool,
 ) -> dict[str, Any] | None:
-    line = json.dumps(envelope, separators=(",", ":"))
+    line = encode_envelope(envelope)
     if dry_run:
         print(line)
         return {"type": "dryRun"}
 
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        try:
-            sock.connect(socket_path)
-        except FileNotFoundError:
-            raise RuntimeError(
-                f"Bridge socket not found at {socket_path}. Start the dev app with `zsh scripts/launch-dev-app.sh`."
-            )
-        except ConnectionRefusedError:
-            raise RuntimeError(
-                f"Bridge socket refused connection at {socket_path}. Restart the dev app and try again."
-            )
-
+    with connect_bridge(socket_path) as sock:
         sock.sendall(line.encode("utf-8") + b"\n")
         if wait_response:
             return recv_response(sock, timeout)
@@ -275,23 +299,61 @@ def send_envelope(
         return None
 
 
+def hold_interaction(
+    socket_path: str,
+    envelope: dict[str, Any],
+    *,
+    timeout: float | None,
+    dry_run: bool,
+    label: str,
+) -> dict[str, Any] | None:
+    line = encode_envelope(envelope)
+    if dry_run:
+        print(line)
+        return {"type": "dryRun"}
+
+    with connect_bridge(socket_path) as sock:
+        sock.sendall(line.encode("utf-8") + b"\n")
+        print(f"  sent {label}; keeping hook connected until UI resolution")
+        print("  answer the card in Open Island, or press Ctrl-C to cancel")
+        return recv_response(sock, timeout)
+
+
 def replay_one(
     scenario: str,
     *,
     socket_path: str,
     cwd: str,
     timeout: float,
+    hold_timeout: float | None,
+    hold_interactions: bool,
     dry_run: bool,
 ) -> None:
     print(f"Replaying {scenario} bridge scenario")
-    for label, envelope, wait_response in scenario_commands(scenario, cwd):
-        response = send_envelope(
-            socket_path,
-            envelope,
-            wait_response=wait_response,
-            timeout=timeout,
-            dry_run=dry_run,
-        )
+    for label, envelope, wait_response, can_hold in scenario_commands(scenario, cwd):
+        if can_hold and hold_interactions:
+            response = hold_interaction(
+                socket_path,
+                envelope,
+                timeout=hold_timeout,
+                dry_run=dry_run,
+                label=label,
+            )
+            if dry_run:
+                print(f"  sent {label}")
+            elif response is None:
+                print(f"  {label} ended without a bridge response")
+            else:
+                print(f"  resolved {label}")
+            continue
+        else:
+            response = send_envelope(
+                socket_path,
+                envelope,
+                wait_response=wait_response,
+                timeout=timeout,
+                dry_run=dry_run,
+            )
         if wait_response and response is None and not dry_run:
             raise RuntimeError(f"{label} did not return a bridge response")
         print(f"  sent {label}")
@@ -323,6 +385,17 @@ def main() -> int:
         help="Response timeout for non-blocking bridge commands.",
     )
     parser.add_argument(
+        "--hold-timeout",
+        type=float,
+        default=DEFAULT_HOLD_TIMEOUT,
+        help="Seconds to keep approval/question replay hooks connected while waiting for UI resolution. 0 waits indefinitely.",
+    )
+    parser.add_argument(
+        "--no-hold",
+        action="store_true",
+        help="Do not keep approval/question hooks connected. Mostly useful for inspecting raw bridge cleanup behavior.",
+    )
+    parser.add_argument(
         "--delay",
         type=float,
         default=1.4,
@@ -336,6 +409,11 @@ def main() -> int:
     args = parser.parse_args()
 
     scenarios = ("approval", "question", "completion") if args.scenario == "all" else (args.scenario,)
+    hold_interactions = not args.no_hold and args.scenario != "all"
+    hold_timeout = None if args.hold_timeout <= 0 else args.hold_timeout
+
+    if args.scenario == "all" and not args.no_hold and not args.dry_run:
+        print("`all` replays without holding approval/question sockets; use an individual scenario for UI inspection.")
 
     try:
         for index, scenario in enumerate(scenarios):
@@ -346,8 +424,13 @@ def main() -> int:
                 socket_path=args.socket,
                 cwd=args.cwd,
                 timeout=args.timeout,
+                hold_timeout=hold_timeout,
+                hold_interactions=hold_interactions,
                 dry_run=args.dry_run,
             )
+    except KeyboardInterrupt:
+        print("\nReplay cancelled.")
+        return 130
     except RuntimeError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
