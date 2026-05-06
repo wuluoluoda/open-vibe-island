@@ -11,6 +11,23 @@ The repository harness exists to make a round of work mechanically checkable. Th
 - `scripts/harness.sh smoke` launches the macOS app in harness mode, loads a deterministic debug scenario, captures local artifacts, and auto-exits after a short timeout.
 - `scripts/harness.sh smoke-all` runs the full debug-scenario suite and validates each artifact set.
 - `scripts/check-docs.sh` enforces the minimum doc map and required links.
+- `scripts/codex-round.sh begin <round-name>` creates an annotated checkpoint tag before a Codex work round. It requires a clean worktree so the tag is a reliable rollback point.
+- `scripts/codex-round.sh finish -m <commit-message> [round-name]` runs the three app build products, stages all changes, commits them, and creates an annotated finish tag.
+
+## Codex Round Control
+
+Use `scripts/codex-round.sh` when a round needs explicit commit/tag control:
+
+```bash
+scripts/codex-round.sh begin codex-shelf-redesign
+# make the focused change
+scripts/codex-round.sh finish -m "feat: require contribution proof for codex shelf" codex-shelf-redesign
+```
+
+The begin tag is named like `checkpoint/begin/<branch>/<timestamp>-<round-name>`.
+The finish tag is named like `checkpoint/finish/<branch>/<timestamp>-<round-name>`.
+
+This is intentionally local and mechanical: the command does not push tags or branches. Push remains a separate integration decision.
 
 ## Current Guarantees
 
