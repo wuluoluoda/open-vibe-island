@@ -81,6 +81,7 @@ public struct SessionState: Equatable, Sendable {
             session.isSessionEnded = false
             session.isProcessAlive = true
             session.processNotSeenCount = 0
+            session.lastTurnInterrupted = false
             upsert(session)
 
         case let .activityUpdated(payload):
@@ -99,6 +100,9 @@ public struct SessionState: Equatable, Sendable {
             if !preservesActionableState {
                 session.phase = payload.phase
                 session.summary = payload.summary
+                session.lastTurnInterrupted = payload.phase == .completed
+                    ? Self.summarySuggestsInterruption(payload.summary)
+                    : false
                 if payload.phase != .waitingForApproval {
                     session.permissionRequest = nil
                 }
@@ -119,6 +123,7 @@ public struct SessionState: Equatable, Sendable {
             session.summary = payload.request.summary
             session.permissionRequest = payload.request
             session.questionPrompt = nil
+            session.lastTurnInterrupted = false
             session.updatedAt = payload.timestamp
             upsert(session)
 
@@ -131,6 +136,7 @@ public struct SessionState: Equatable, Sendable {
             session.summary = payload.prompt.title
             session.questionPrompt = payload.prompt
             session.permissionRequest = nil
+            session.lastTurnInterrupted = false
             session.updatedAt = payload.timestamp
             upsert(session)
 
@@ -141,6 +147,7 @@ public struct SessionState: Equatable, Sendable {
 
             session.phase = .completed
             session.summary = payload.summary
+            session.lastTurnInterrupted = payload.isInterrupt ?? Self.summarySuggestsInterruption(payload.summary)
             session.permissionRequest = nil
             session.questionPrompt = nil
             session.updatedAt = payload.timestamp
@@ -215,6 +222,7 @@ public struct SessionState: Equatable, Sendable {
 
             session.phase = .running
             session.summary = payload.summary
+            session.lastTurnInterrupted = false
             session.permissionRequest = nil
             session.questionPrompt = nil
             session.updatedAt = payload.timestamp
@@ -236,6 +244,7 @@ public struct SessionState: Equatable, Sendable {
 
         if resolution.isApproved {
             session.phase = .running
+            session.lastTurnInterrupted = false
             switch session.tool {
             case .claudeCode, .geminiCLI, .qoder, .qwenCode, .factory, .codebuddy, .kimiCLI:
                 session.summary = "Permission approved. \(session.tool.displayName) continued the tool."
@@ -246,6 +255,7 @@ public struct SessionState: Equatable, Sendable {
             }
         } else {
             session.phase = .completed
+            session.lastTurnInterrupted = false
             switch session.tool {
             case .claudeCode, .geminiCLI, .qoder, .qwenCode, .factory, .codebuddy, .kimiCLI:
                 session.summary = "Permission denied in Open Island."
@@ -270,6 +280,7 @@ public struct SessionState: Equatable, Sendable {
 
         session.questionPrompt = nil
         session.phase = .running
+        session.lastTurnInterrupted = false
         let summary = response.displaySummary
         session.summary = summary.isEmpty ? "Answered the question." : "Answered: \(summary)"
         session.updatedAt = timestamp
@@ -434,6 +445,7 @@ public struct SessionState: Equatable, Sendable {
         guard var session = sessionsByID[id] else { return }
         session.isSessionEnded = true
         session.phase = .completed
+        session.lastTurnInterrupted = false
         session.updatedAt = .now
         upsert(session)
     }
@@ -448,5 +460,16 @@ public struct SessionState: Equatable, Sendable {
 
     private mutating func upsert(_ session: AgentSession) {
         sessionsByID[session.id] = session
+    }
+
+    private static func summarySuggestsInterruption(_ summary: String) -> Bool {
+        let normalized = summary.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else {
+            return false
+        }
+
+        return normalized.contains("interrupt")
+            || normalized.contains("aborted")
+            || normalized.contains("cancelled")
     }
 }

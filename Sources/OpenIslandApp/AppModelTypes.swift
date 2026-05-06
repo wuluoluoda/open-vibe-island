@@ -20,6 +20,22 @@ enum TrackedEventIngress {
     case rollout
 }
 
+enum RuntimeConnectionState: String, Sendable {
+    case disconnected
+    case connecting
+    case reconnecting
+    case connected
+
+    var isConnectingLike: Bool {
+        switch self {
+        case .connecting, .reconnecting:
+            true
+        case .disconnected, .connected:
+            false
+        }
+    }
+}
+
 // MARK: - Island appearance
 
 enum IslandAppearanceMode: String, CaseIterable, Identifiable {

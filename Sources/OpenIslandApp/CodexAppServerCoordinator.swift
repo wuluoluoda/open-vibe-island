@@ -17,6 +17,15 @@ final class CodexAppServerCoordinator {
     @ObservationIgnored
     private var connectTask: Task<Void, Never>?
 
+    @ObservationIgnored
+    private var reconnectTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var healthCheckTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var hasConnectedOnce = false
+
     /// Callback to emit AgentEvents into AppModel.
     @ObservationIgnored
     var onEvent: ((AgentEvent) -> Void)?
@@ -25,6 +34,10 @@ final class CodexAppServerCoordinator {
     @ObservationIgnored
     var onStatusMessage: ((String) -> Void)?
 
+    /// Fires when connection lifecycle changes (connecting/reconnecting/etc).
+    @ObservationIgnored
+    var onConnectionStateChanged: ((RuntimeConnectionState) -> Void)?
+
     /// Returns `true` if a session with the given id is already tracked.
     /// Used to avoid re-emitting `sessionStarted` (which rebuilds the
     /// session and wipes richer state from hooks/rediscovery).
@@ -32,6 +45,18 @@ final class CodexAppServerCoordinator {
     var isSessionTracked: ((String) -> Bool)?
 
     private(set) var isConnected = false
+    private(set) var connectionState: RuntimeConnectionState = .disconnected {
+        didSet {
+            guard connectionState != oldValue else {
+                return
+            }
+            onConnectionStateChanged?(connectionState)
+        }
+    }
+
+    private static let reconnectDelay: Duration = .seconds(2)
+    private static let maxReconnectDelay: Duration = .seconds(20)
+    private static let healthCheckInterval: Duration = .seconds(15)
 
     // MARK: - Public API
 
@@ -40,6 +65,7 @@ final class CodexAppServerCoordinator {
     /// already connected or a connection attempt is in progress.
     func ensureConnected() {
         guard !isConnected, connectTask == nil else { return }
+        connectionState = hasConnectedOnce ? .reconnecting : .connecting
 
         // Resolve the Codex.app bundle location dynamically — users may
         // have installed Codex outside `/Applications` (e.g. ~/Applications).
@@ -68,15 +94,27 @@ final class CodexAppServerCoordinator {
 
                 self.client = newClient
                 self.isConnected = true
+                self.connectionState = .connected
+                self.hasConnectedOnce = true
                 self.connectTask = nil
+                self.reconnectTask?.cancel()
+                self.reconnectTask = nil
 
                 self.onStatusMessage?("Connected to Codex app-server.")
 
                 // Fetch currently live threads and create sessions.
                 await self.syncCurrentThreads()
+                self.startHealthCheckLoop()
             } catch {
                 self.connectTask = nil
+                self.isConnected = false
                 self.onStatusMessage?("Failed to connect to Codex app-server: \(error.localizedDescription)")
+                if ProcessMonitoringCoordinator.isCodexDesktopAppRunning() {
+                    self.connectionState = self.hasConnectedOnce ? .reconnecting : .connecting
+                    self.scheduleReconnect()
+                } else {
+                    self.connectionState = .disconnected
+                }
             }
         }
     }
@@ -85,9 +123,14 @@ final class CodexAppServerCoordinator {
     func disconnect() {
         connectTask?.cancel()
         connectTask = nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        healthCheckTask?.cancel()
+        healthCheckTask = nil
         client?.stop()
         client = nil
         isConnected = false
+        connectionState = .disconnected
     }
 
     // MARK: - Thread sync
@@ -110,6 +153,7 @@ final class CodexAppServerCoordinator {
             }
         } catch {
             onStatusMessage?("Failed to list current Codex threads: \(error.localizedDescription)")
+            handleConnectionLossIfNeeded(reason: "Codex app-server sync failed. Reconnecting…")
         }
     }
 
@@ -288,5 +332,79 @@ final class CodexAppServerCoordinator {
                 )
             )
         ))
+    }
+
+    private func startHealthCheckLoop() {
+        healthCheckTask?.cancel()
+        healthCheckTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.healthCheckInterval)
+                guard !Task.isCancelled else { return }
+                guard self.isConnected, let client = self.client else { continue }
+
+                do {
+                    _ = try await self.currentThreads(from: client)
+                } catch {
+                    self.handleConnectionLossIfNeeded(reason: "Lost Codex app-server connection. Reconnecting…")
+                    return
+                }
+            }
+        }
+    }
+
+    private func scheduleReconnect() {
+        guard reconnectTask == nil else {
+            return
+        }
+
+        reconnectTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            var delay = Self.reconnectDelay
+            while !Task.isCancelled {
+                try? await Task.sleep(for: delay)
+                guard !Task.isCancelled else { return }
+                guard ProcessMonitoringCoordinator.isCodexDesktopAppRunning() else {
+                    self.connectionState = .disconnected
+                    self.reconnectTask = nil
+                    return
+                }
+
+                self.connectTask = nil
+                self.ensureConnected()
+
+                if self.isConnected {
+                    self.reconnectTask = nil
+                    return
+                }
+
+                delay = min(delay * 2, Self.maxReconnectDelay)
+            }
+        }
+    }
+
+    private func handleConnectionLossIfNeeded(reason: String) {
+        guard isConnected || connectTask != nil else {
+            return
+        }
+
+        client?.stop()
+        client = nil
+        isConnected = false
+        connectTask?.cancel()
+        connectTask = nil
+        healthCheckTask?.cancel()
+        healthCheckTask = nil
+
+        guard ProcessMonitoringCoordinator.isCodexDesktopAppRunning() else {
+            connectionState = .disconnected
+            return
+        }
+
+        connectionState = .reconnecting
+        onStatusMessage?(reason)
+        scheduleReconnect()
     }
 }

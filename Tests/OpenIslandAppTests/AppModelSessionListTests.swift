@@ -884,4 +884,127 @@ struct AppModelSessionListTests {
         let claudeSessions = model.state.sessions.filter { $0.tool == .claudeCode }
         #expect(claudeSessions.count == 2)
     }
+
+    @Test
+    func codexRadarAggregatesByProjectAndPrioritizesActionableProject() {
+        let now = Date(timeIntervalSince1970: 4_000)
+        let model = AppModel()
+
+        var approvalSession = AgentSession(
+            id: "codex-approval",
+            title: "Codex · project-alpha",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .waitingForApproval,
+            summary: "Needs approval",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "project-alpha",
+                paneTitle: "codex ~/project-alpha",
+                workingDirectory: "/tmp/project-alpha"
+            ),
+            codexMetadata: CodexSessionMetadata(lastUserPrompt: "Ship alpha patch")
+        )
+        approvalSession.isProcessAlive = true
+
+        var runningAlpha = AgentSession(
+            id: "codex-alpha-running",
+            title: "Codex · project-alpha",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Running alpha task",
+            updatedAt: now.addingTimeInterval(-20),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "project-alpha",
+                paneTitle: "codex ~/project-alpha",
+                workingDirectory: "/tmp/project-alpha"
+            ),
+            codexMetadata: CodexSessionMetadata(lastUserPrompt: "Refine alpha task")
+        )
+        runningAlpha.isProcessAlive = true
+
+        var runningBeta = AgentSession(
+            id: "codex-beta-running",
+            title: "Codex · project-beta",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Running beta task",
+            updatedAt: now.addingTimeInterval(-5),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "project-beta",
+                paneTitle: "codex ~/project-beta",
+                workingDirectory: "/tmp/project-beta"
+            ),
+            codexMetadata: CodexSessionMetadata(lastUserPrompt: "Keep beta running")
+        )
+        runningBeta.isProcessAlive = true
+
+        model.state = SessionState(sessions: [runningBeta, approvalSession, runningAlpha])
+
+        let radar = model.codexRadarProjects
+        #expect(radar.count == 2)
+        #expect(radar.first?.projectName == "project-alpha")
+        #expect(radar.first?.topStatus == .waitingApproval)
+        #expect(radar.first?.runningTaskCount == 1)
+        #expect(radar.first?.actionableTaskCount == 1)
+        #expect(radar.first?.latestSummary == "Ship alpha patch")
+        #expect(radar.first?.primarySessionID == "codex-approval")
+    }
+
+    @Test
+    func codexRadarUsesRunningProjectWhenNoActionableRiskExists() {
+        let now = Date(timeIntervalSince1970: 4_500)
+        let model = AppModel()
+
+        var running = AgentSession(
+            id: "codex-running",
+            title: "Codex · radar-repo",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Running",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "radar-repo",
+                paneTitle: "codex ~/radar-repo",
+                workingDirectory: "/tmp/radar-repo"
+            )
+        )
+        running.isProcessAlive = true
+
+        var completed = AgentSession(
+            id: "codex-completed",
+            title: "Codex · old-repo",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Done",
+            updatedAt: now.addingTimeInterval(-500),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "old-repo",
+                paneTitle: "codex ~/old-repo",
+                workingDirectory: "/tmp/old-repo"
+            )
+        )
+        completed.isProcessAlive = true
+
+        model.state = SessionState(sessions: [completed, running])
+
+        let radar = model.codexRadarProjects
+        #expect(radar.count == 2)
+        #expect(radar.first?.projectName == "radar-repo")
+        #expect(radar.first?.topStatus == .running)
+    }
 }

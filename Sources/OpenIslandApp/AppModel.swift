@@ -26,6 +26,11 @@ final class AppModel {
     private static let showCodexUsageDefaultsKey = "app.showCodexUsage"
     private static let completionReplyEnabledDefaultsKey = "feature.completionReply.enabled"
     private static let suppressFrontmostNotificationsDefaultsKey = "app.suppressFrontmostNotifications"
+    private static let codexStalledThresholdMinutesDefaultsKey = "feature.codex.stalledThresholdMinutes"
+    private static let codexLoopSuspectedEnabledDefaultsKey = "feature.codex.loopSuspected.enabled"
+    private static let codexLoopSuspectedThresholdDefaultsKey = "feature.codex.loopSuspected.threshold"
+    private static let codexShelfEnabledDefaultsKey = "feature.codex.shelf.enabled"
+    private static let codexRadarEnabledDefaultsKey = "feature.codex.radar.enabled"
 
     static let defaultStatusColors: [SessionPhase: String] = [
         .running: "#6E9FFF",
@@ -44,6 +49,26 @@ final class AppModel {
         let detail: String
         let isComplete: Bool
     }
+
+    struct CodexRadarProject: Identifiable, Equatable {
+        let id: String
+        let projectName: String
+        let topStatus: CodexOperationalStatus
+        let runningTaskCount: Int
+        let actionableTaskCount: Int
+        let latestSummary: String
+        let updatedAt: Date
+        let primarySessionID: String
+        let sessionIDs: [String]
+    }
+
+    private struct LoopSignal: Equatable {
+        var fingerprint: String
+        var repeatCount: Int
+        var lastSeenAt: Date
+    }
+
+    private static let loopSignalRetentionWindow: TimeInterval = 20 * 60
 
     let lang = LanguageManager.shared
 
@@ -258,6 +283,38 @@ final class AppModel {
             UserDefaults.standard.set(suppressFrontmostNotifications, forKey: Self.suppressFrontmostNotificationsDefaultsKey)
         }
     }
+    var codexStalledThresholdMinutes: Int = 12 {
+        didSet {
+            codexStalledThresholdMinutes = max(3, codexStalledThresholdMinutes)
+            guard hasFinishedInit, codexStalledThresholdMinutes != oldValue else { return }
+            UserDefaults.standard.set(codexStalledThresholdMinutes, forKey: Self.codexStalledThresholdMinutesDefaultsKey)
+        }
+    }
+    var codexLoopSuspectedEnabled: Bool = false {
+        didSet {
+            guard hasFinishedInit, codexLoopSuspectedEnabled != oldValue else { return }
+            UserDefaults.standard.set(codexLoopSuspectedEnabled, forKey: Self.codexLoopSuspectedEnabledDefaultsKey)
+        }
+    }
+    var codexLoopSuspectedThreshold: Int = 4 {
+        didSet {
+            codexLoopSuspectedThreshold = max(3, codexLoopSuspectedThreshold)
+            guard hasFinishedInit, codexLoopSuspectedThreshold != oldValue else { return }
+            UserDefaults.standard.set(codexLoopSuspectedThreshold, forKey: Self.codexLoopSuspectedThresholdDefaultsKey)
+        }
+    }
+    var codexShelfEnabled: Bool = true {
+        didSet {
+            guard hasFinishedInit, codexShelfEnabled != oldValue else { return }
+            UserDefaults.standard.set(codexShelfEnabled, forKey: Self.codexShelfEnabledDefaultsKey)
+        }
+    }
+    var codexRadarEnabled: Bool = true {
+        didSet {
+            guard hasFinishedInit, codexRadarEnabled != oldValue else { return }
+            UserDefaults.standard.set(codexRadarEnabled, forKey: Self.codexRadarEnabledDefaultsKey)
+        }
+    }
     var launchAtLoginEnabled: Bool = false {
         didSet {
             guard !isApplyingLaunchAtLogin, hasFinishedInit, launchAtLoginEnabled != oldValue else { return }
@@ -468,12 +525,25 @@ final class AppModel {
 
     var ignoresPointerExitDuringHarness = false
     var disablesOverlayEventMonitoringDuringHarness = false
+    private(set) var bridgeConnectionState: RuntimeConnectionState = .disconnected {
+        didSet {
+            guard bridgeConnectionState != oldValue else { return }
+            _cachedSessionBuckets = nil
+            refreshOverlayPlacementIfVisible()
+        }
+    }
 
     @ObservationIgnored
     private var bridgeTask: Task<Void, Never>?
 
     @ObservationIgnored
     private var bridgeReconnectTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var hasBridgeConnectedOnce = false
+
+    @ObservationIgnored
+    private var loopSignalsBySessionID: [String: LoopSignal] = [:]
 
     @ObservationIgnored
     private var hasStarted = false
@@ -516,6 +586,11 @@ final class AppModel {
             Self.hapticFeedbackEnabledDefaultsKey: false,
             Self.completionReplyEnabledDefaultsKey: false,
             Self.suppressFrontmostNotificationsDefaultsKey: true,
+            Self.codexStalledThresholdMinutesDefaultsKey: 12,
+            Self.codexLoopSuspectedEnabledDefaultsKey: false,
+            Self.codexLoopSuspectedThresholdDefaultsKey: 4,
+            Self.codexShelfEnabledDefaultsKey: true,
+            Self.codexRadarEnabledDefaultsKey: true,
         ])
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
         selectedSoundName = NotificationSoundService.selectedSoundName
@@ -530,6 +605,11 @@ final class AppModel {
             )
         }
         completionReplyEnabled = UserDefaults.standard.bool(forKey: Self.completionReplyEnabledDefaultsKey)
+        codexStalledThresholdMinutes = UserDefaults.standard.integer(forKey: Self.codexStalledThresholdMinutesDefaultsKey)
+        codexLoopSuspectedEnabled = UserDefaults.standard.bool(forKey: Self.codexLoopSuspectedEnabledDefaultsKey)
+        codexLoopSuspectedThreshold = UserDefaults.standard.integer(forKey: Self.codexLoopSuspectedThresholdDefaultsKey)
+        codexShelfEnabled = UserDefaults.standard.bool(forKey: Self.codexShelfEnabledDefaultsKey)
+        codexRadarEnabled = UserDefaults.standard.bool(forKey: Self.codexRadarEnabledDefaultsKey)
         launchAtLoginEnabled = LaunchAtLoginService.shared.isEnabled
         islandAppearanceMode = IslandAppearanceMode(
             rawValue: UserDefaults.standard.string(forKey: Self.islandAppearanceModeDefaultsKey) ?? ""
@@ -602,6 +682,10 @@ final class AppModel {
         codexAppServer.onStatusMessage = { [weak self] message in
             self?.lastActionMessage = message
         }
+        codexAppServer.onConnectionStateChanged = { [weak self] _ in
+            self?._cachedSessionBuckets = nil
+            self?.refreshOverlayPlacementIfVisible()
+        }
         codexAppServer.isSessionTracked = { [weak self] id in
             self?.state.session(id: id) != nil
         }
@@ -662,6 +746,80 @@ final class AppModel {
 
     var islandListSessions: [AgentSession] {
         surfacedSessions
+    }
+
+    func codexOperationalStatus(
+        for session: AgentSession,
+        at date: Date = .now
+    ) -> CodexOperationalStatus {
+        let signals = CodexOperationalStatusSignals(
+            now: date,
+            bridgeConnectionState: bridgeConnectionState,
+            codexAppServerConnectionState: codexAppServer.connectionState,
+            stalledThreshold: TimeInterval(codexStalledThresholdMinutes) * 60,
+            loopSuspectedEnabled: codexLoopSuspectedEnabled,
+            loopRepeatCount: loopRepeatCount(for: session.id),
+            loopSuspectedThreshold: codexLoopSuspectedThreshold,
+            recentCompletionWindow: 20 * 60
+        )
+        return session.codexOperationalStatus(signals: signals)
+    }
+
+    var codexRadarProjects: [CodexRadarProject] {
+        guard codexRadarEnabled else {
+            return []
+        }
+
+        let codexSessions = surfacedSessions.filter { $0.tool == .codex }
+        guard !codexSessions.isEmpty else {
+            return []
+        }
+
+        let grouped = Dictionary(grouping: codexSessions, by: radarProjectName(for:))
+        let projects = grouped.compactMap { projectName, sessions -> CodexRadarProject? in
+            let topSession = sessions.max { lhs, rhs in
+                let lhsStatus = codexOperationalStatus(for: lhs)
+                let rhsStatus = codexOperationalStatus(for: rhs)
+                if lhsStatus.priority == rhsStatus.priority {
+                    return lhs.updatedAt < rhs.updatedAt
+                }
+                return lhsStatus.priority < rhsStatus.priority
+            }
+
+            guard let topSession else {
+                return nil
+            }
+
+            let status = codexOperationalStatus(for: topSession)
+            let sortedSessions = sessions.sorted { $0.updatedAt > $1.updatedAt }
+            let latestSession = sortedSessions.first ?? topSession
+            let latestSummary = latestSession.latestUserPromptText?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .nonEmpty
+                ?? latestSession.summary
+
+            return CodexRadarProject(
+                id: projectName.lowercased(),
+                projectName: projectName,
+                topStatus: status,
+                runningTaskCount: sessions.filter { $0.phase == .running }.count,
+                actionableTaskCount: sessions.filter { codexOperationalStatus(for: $0).requiresUserAction }.count,
+                latestSummary: latestSummary,
+                updatedAt: latestSession.updatedAt,
+                primarySessionID: topSession.id,
+                sessionIDs: sessions.map(\.id)
+            )
+        }
+
+        return projects.sorted { lhs, rhs in
+            if lhs.topStatus.priority == rhs.topStatus.priority {
+                if lhs.updatedAt == rhs.updatedAt {
+                    return lhs.projectName.localizedStandardCompare(rhs.projectName) == .orderedAscending
+                }
+                return lhs.updatedAt > rhs.updatedAt
+            }
+            return lhs.topStatus.priority > rhs.topStatus.priority
+        }
     }
 
     var recentSessionCount: Int {
@@ -827,6 +985,7 @@ final class AppModel {
 
         guard startBridge else {
             isBridgeReady = false
+            bridgeConnectionState = .disconnected
             lastActionMessage = loadRuntimeState
                 ? "Harness mode active. Bridge startup skipped."
                 : "Deterministic harness mode active. Runtime discovery and bridge startup skipped."
@@ -835,10 +994,12 @@ final class AppModel {
         }
 
         do {
+            bridgeConnectionState = hasBridgeConnectedOnce ? .reconnecting : .connecting
             try bridgeServer.start()
             connectBridgeObserver()
         } catch {
             isBridgeReady = false
+            bridgeConnectionState = .disconnected
             lastActionMessage = "Failed to start local bridge: \(error.localizedDescription)"
             harnessRuntimeMonitor?.recordMilestone("bridgeStartFailed", message: lastActionMessage)
         }
@@ -852,6 +1013,7 @@ final class AppModel {
     private func connectBridgeObserver() {
         bridgeTask?.cancel()
         bridgeReconnectTask?.cancel()
+        bridgeConnectionState = hasBridgeConnectedOnce ? .reconnecting : .connecting
 
         // Explicitly disconnect the old client so its DispatchSource is
         // cancelled deterministically rather than relying on dealloc timing.
@@ -867,6 +1029,7 @@ final class AppModel {
             stream = try client.connect()
         } catch {
             isBridgeReady = false
+            bridgeConnectionState = hasBridgeConnectedOnce ? .reconnecting : .connecting
             lastActionMessage = "Failed to connect bridge observer: \(error.localizedDescription)"
             scheduleBridgeReconnect()
             return
@@ -880,11 +1043,14 @@ final class AppModel {
             do {
                 try await client.send(.registerClient(role: .observer))
                 self.isBridgeReady = true
+                self.bridgeConnectionState = .connected
+                self.hasBridgeConnectedOnce = true
                 self.lastActionMessage = "Bridge ready. Waiting for Claude and Codex hook events."
                 self.harnessRuntimeMonitor?.recordMilestone("bridgeReady", message: self.lastActionMessage)
             } catch {
                 guard !Task.isCancelled else { return }
                 self.isBridgeReady = false
+                self.bridgeConnectionState = self.hasBridgeConnectedOnce ? .reconnecting : .connecting
                 self.lastActionMessage = "Failed to register bridge observer: \(error.localizedDescription)"
                 self.harnessRuntimeMonitor?.recordMilestone(
                     "bridgeRegistrationFailed",
@@ -904,6 +1070,7 @@ final class AppModel {
             // Mark as disconnected and schedule reconnection.
             guard !Task.isCancelled else { return }
             self.isBridgeReady = false
+            self.bridgeConnectionState = .reconnecting
             self.lastActionMessage = "Bridge observer disconnected. Reconnecting…"
             self.harnessRuntimeMonitor?.recordMilestone("bridgeDisconnected", message: self.lastActionMessage)
             self.scheduleBridgeReconnect()
@@ -1195,6 +1362,8 @@ final class AppModel {
         updateLastActionMessage: Bool = true,
         ingress: TrackedEventIngress = .bridge
     ) {
+        let eventSessionID = sessionID(for: event)
+
         // Snapshot whether this session was already completed before applying
         // the event. Used to suppress duplicate/stale completion notifications
         // (e.g. rollout watcher re-discovering an old completion on startup,
@@ -1216,6 +1385,7 @@ final class AppModel {
         }
 
         state.apply(event)
+        updateLoopSignal(for: event, sessionID: eventSessionID)
         reconcileIslandSurfaceAfterStateChange()
         if ingress == .bridge {
             monitoring.markSessionAttached(for: event)
@@ -1231,22 +1401,6 @@ final class AppModel {
 
         // Push relevant events to the Watch/iPhone via the relay
         if let relay = watchRelay {
-            let eventSessionID: String? = {
-                switch event {
-                case let .sessionStarted(p): return p.sessionID
-                case let .activityUpdated(p): return p.sessionID
-                case let .permissionRequested(p): return p.sessionID
-                case let .questionAsked(p): return p.sessionID
-                case let .sessionCompleted(p): return p.sessionID
-                case let .jumpTargetUpdated(p): return p.sessionID
-                case let .sessionMetadataUpdated(p): return p.sessionID
-                case let .claudeSessionMetadataUpdated(p): return p.sessionID
-                case let .geminiSessionMetadataUpdated(p): return p.sessionID
-                case let .openCodeSessionMetadataUpdated(p): return p.sessionID
-                case let .cursorSessionMetadataUpdated(p): return p.sessionID
-                case let .actionableStateResolved(p): return p.sessionID
-                }
-            }()
             let session = eventSessionID.flatMap { state.session(id: $0) }
             relay.notifyEvent(event, session: session)
         }
@@ -1310,6 +1464,143 @@ final class AppModel {
         return (ingress == .bridge || !isResolvingInitialLiveSessions)
             && (notchStatus == .closed || notchOpenReason == .notification)
             && surface.matchesCurrentState(of: session)
+    }
+
+    private func radarProjectName(for session: AgentSession) -> String {
+        let workspace = session.spotlightWorkspaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let first = workspace.split(separator: "·", maxSplits: 1).first {
+            let normalized = String(first).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !normalized.isEmpty {
+                return normalized
+            }
+        }
+        if !workspace.isEmpty {
+            return workspace
+        }
+        return "Unknown Project"
+    }
+
+    private func sessionID(for event: AgentEvent) -> String? {
+        switch event {
+        case let .sessionStarted(payload):
+            payload.sessionID
+        case let .activityUpdated(payload):
+            payload.sessionID
+        case let .permissionRequested(payload):
+            payload.sessionID
+        case let .questionAsked(payload):
+            payload.sessionID
+        case let .sessionCompleted(payload):
+            payload.sessionID
+        case let .jumpTargetUpdated(payload):
+            payload.sessionID
+        case let .sessionMetadataUpdated(payload):
+            payload.sessionID
+        case let .claudeSessionMetadataUpdated(payload):
+            payload.sessionID
+        case let .geminiSessionMetadataUpdated(payload):
+            payload.sessionID
+        case let .openCodeSessionMetadataUpdated(payload):
+            payload.sessionID
+        case let .cursorSessionMetadataUpdated(payload):
+            payload.sessionID
+        case let .actionableStateResolved(payload):
+            payload.sessionID
+        }
+    }
+
+    private func loopRepeatCount(for sessionID: String) -> Int {
+        loopSignalsBySessionID[sessionID]?.repeatCount ?? 0
+    }
+
+    private func updateLoopSignal(for event: AgentEvent, sessionID: String?) {
+        guard let sessionID else {
+            return
+        }
+
+        guard let session = state.session(id: sessionID) else {
+            loopSignalsBySessionID.removeValue(forKey: sessionID)
+            return
+        }
+
+        let now = session.updatedAt
+        pruneExpiredLoopSignals(referenceDate: now)
+
+        guard session.tool == .codex,
+              let fingerprint = loopFingerprint(for: event, session: session) else {
+            if session.phase != .running {
+                loopSignalsBySessionID.removeValue(forKey: sessionID)
+            }
+            return
+        }
+
+        if let existing = loopSignalsBySessionID[sessionID],
+           existing.fingerprint == fingerprint,
+           now.timeIntervalSince(existing.lastSeenAt) <= Self.loopSignalRetentionWindow {
+            loopSignalsBySessionID[sessionID] = LoopSignal(
+                fingerprint: fingerprint,
+                repeatCount: existing.repeatCount + 1,
+                lastSeenAt: now
+            )
+            return
+        }
+
+        loopSignalsBySessionID[sessionID] = LoopSignal(
+            fingerprint: fingerprint,
+            repeatCount: 1,
+            lastSeenAt: now
+        )
+    }
+
+    private func pruneExpiredLoopSignals(referenceDate: Date) {
+        loopSignalsBySessionID = loopSignalsBySessionID.filter { _, signal in
+            referenceDate.timeIntervalSince(signal.lastSeenAt) <= Self.loopSignalRetentionWindow
+        }
+    }
+
+    private func loopFingerprint(for event: AgentEvent, session: AgentSession) -> String? {
+        if let toolName = session.currentToolName?.normalizedLoopToken,
+           let preview = session.currentCommandPreviewText?.normalizedLoopToken,
+           !preview.isEmpty {
+            return "tool:\(toolName)|preview:\(preview)"
+        }
+
+        let summary: String
+        switch event {
+        case let .activityUpdated(payload):
+            summary = payload.summary
+        case let .sessionCompleted(payload):
+            summary = payload.summary
+        default:
+            summary = session.summary
+        }
+
+        let normalizedSummary = summary.normalizedLoopToken
+        guard !normalizedSummary.isEmpty,
+              Self.looksLikeFailureSummary(normalizedSummary) else {
+            return nil
+        }
+        return "failure:\(normalizedSummary)"
+    }
+
+    private static func looksLikeFailureSummary(_ summary: String) -> Bool {
+        let failureMarkers = [
+            " failed",
+            " error",
+            " denied",
+            " unable",
+            " timed out",
+            " interrupted",
+            " aborted",
+        ]
+
+        for marker in failureMarkers where summary.contains(marker) {
+            return true
+        }
+
+        return summary.hasPrefix("failed")
+            || summary.hasPrefix("error")
+            || summary.hasPrefix("unable")
     }
 
     private func synchronizeSelection() {
@@ -1426,6 +1717,32 @@ final class AppModel {
     }
 
     private func displayPriority(for session: AgentSession, now: Date) -> Int {
+        if session.tool == .codex {
+            let status = codexOperationalStatus(for: session, at: now)
+            var score = status.priority * 100
+
+            if session.currentToolName?.isEmpty == false {
+                score += 600
+            }
+            if session.jumpTarget != nil {
+                score += 320
+            }
+
+            let age = now.timeIntervalSince(session.islandActivityDate)
+            switch age {
+            case ..<120:
+                score += 120
+            case ..<900:
+                score += 80
+            case ..<3_600:
+                score += 40
+            default:
+                break
+            }
+
+            return score
+        }
+
         var score = 0
 
         let presence = session.islandPresence(at: now)
@@ -1535,6 +1852,29 @@ extension String {
         let raw = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
         guard raw.count == 6, raw.allSatisfy(\.isHexDigit) else { return "#6E9FFF" }
         return "#\(raw.uppercased())"
+    }
+
+    var normalizedLoopToken: String {
+        let condensed = replacingOccurrences(
+            of: #"\s+"#,
+            with: " ",
+            options: .regularExpression
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+
+        guard !condensed.isEmpty else {
+            return ""
+        }
+
+        if condensed.count <= 180 {
+            return condensed
+        }
+        return String(condensed.prefix(180))
+    }
+
+    var nonEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 

@@ -378,6 +378,10 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
     /// is considered gone. This prevents flicker from momentary `ps` gaps.
     public var processNotSeenCount: Int = 0
 
+    /// True when the latest completed turn ended via interruption rather than
+    /// a normal completion signal.
+    public var lastTurnInterrupted: Bool = false
+
     public init(
         id: String,
         title: String,
@@ -394,7 +398,8 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
         claudeMetadata: ClaudeSessionMetadata? = nil,
         geminiMetadata: GeminiSessionMetadata? = nil,
         openCodeMetadata: OpenCodeSessionMetadata? = nil,
-        cursorMetadata: CursorSessionMetadata? = nil
+        cursorMetadata: CursorSessionMetadata? = nil,
+        lastTurnInterrupted: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -412,6 +417,7 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
         self.geminiMetadata = geminiMetadata
         self.openCodeMetadata = openCodeMetadata
         self.cursorMetadata = cursorMetadata
+        self.lastTurnInterrupted = lastTurnInterrupted
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -431,6 +437,7 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
         case geminiMetadata
         case openCodeMetadata
         case cursorMetadata
+        case lastTurnInterrupted
     }
 
     public init(from decoder: any Decoder) throws {
@@ -451,6 +458,7 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
         geminiMetadata = try container.decodeIfPresent(GeminiSessionMetadata.self, forKey: .geminiMetadata)
         openCodeMetadata = try container.decodeIfPresent(OpenCodeSessionMetadata.self, forKey: .openCodeMetadata)
         cursorMetadata = try container.decodeIfPresent(CursorSessionMetadata.self, forKey: .cursorMetadata)
+        lastTurnInterrupted = try container.decodeIfPresent(Bool.self, forKey: .lastTurnInterrupted) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -471,6 +479,7 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
         try container.encodeIfPresent(geminiMetadata, forKey: .geminiMetadata)
         try container.encodeIfPresent(openCodeMetadata, forKey: .openCodeMetadata)
         try container.encodeIfPresent(cursorMetadata, forKey: .cursorMetadata)
+        try container.encode(lastTurnInterrupted, forKey: .lastTurnInterrupted)
     }
 }
 

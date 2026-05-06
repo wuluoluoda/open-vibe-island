@@ -225,6 +225,71 @@ struct SessionStateTests {
     }
 
     @Test
+    func interruptedCompletionMarksSessionAsInterrupted() {
+        let startedAt = Date(timeIntervalSince1970: 5_700)
+        var state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "codex-interrupt",
+                    title: "Codex · repo",
+                    tool: .codex,
+                    attachmentState: .attached,
+                    phase: .running,
+                    summary: "Running",
+                    updatedAt: startedAt
+                )
+            ]
+        )
+
+        state.apply(
+            .sessionCompleted(
+                SessionCompleted(
+                    sessionID: "codex-interrupt",
+                    summary: "Turn interrupted.",
+                    timestamp: startedAt.addingTimeInterval(10),
+                    isInterrupt: true
+                )
+            )
+        )
+
+        #expect(state.session(id: "codex-interrupt")?.phase == .completed)
+        #expect(state.session(id: "codex-interrupt")?.lastTurnInterrupted == true)
+    }
+
+    @Test
+    func resumedRunningClearsInterruptedFlag() {
+        let startedAt = Date(timeIntervalSince1970: 5_900)
+        var state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "codex-interrupt",
+                    title: "Codex · repo",
+                    tool: .codex,
+                    attachmentState: .attached,
+                    phase: .completed,
+                    summary: "Turn interrupted.",
+                    updatedAt: startedAt,
+                    lastTurnInterrupted: true
+                )
+            ]
+        )
+
+        state.apply(
+            .activityUpdated(
+                SessionActivityUpdated(
+                    sessionID: "codex-interrupt",
+                    summary: "Running new prompt.",
+                    phase: .running,
+                    timestamp: startedAt.addingTimeInterval(6)
+                )
+            )
+        )
+
+        #expect(state.session(id: "codex-interrupt")?.phase == .running)
+        #expect(state.session(id: "codex-interrupt")?.lastTurnInterrupted == false)
+    }
+
+    @Test
     func actionableStateResolvedIsNoOpWhenAlreadyRunning() {
         let startedAt = Date(timeIntervalSince1970: 6_000)
         var state = SessionState(

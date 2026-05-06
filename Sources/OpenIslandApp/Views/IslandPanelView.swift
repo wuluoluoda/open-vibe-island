@@ -134,9 +134,14 @@ struct IslandPanelView: View {
     }
 
     private var closedSpotlightSession: AgentSession? {
-        model.surfacedSessions.first(where: { $0.phase.requiresAttention })
-            ?? model.surfacedSessions.first(where: { $0.phase == .running })
-            ?? model.surfacedSessions.first
+        model.surfacedSessions.max { lhs, rhs in
+            let lhsStatus = model.codexOperationalStatus(for: lhs)
+            let rhsStatus = model.codexOperationalStatus(for: rhs)
+            if lhsStatus.priority == rhsStatus.priority {
+                return lhs.updatedAt < rhs.updatedAt
+            }
+            return lhsStatus.priority < rhsStatus.priority
+        }
     }
 
     private var hasClosedPresence: Bool {
@@ -152,7 +157,19 @@ struct IslandPanelView: View {
         guard let session = closedSpotlightSession else {
             return false
         }
-        return session.phase == .running || session.phase.requiresAttention
+        switch model.codexOperationalStatus(for: session) {
+        case .waitingApproval, .waitingInput, .reconnecting, .connecting, .interrupted, .detached, .stalled, .loopSuspected, .running:
+            return true
+        case .recentlyCompleted, .completed:
+            return false
+        }
+    }
+
+    private var closedSpotlightNeedsAction: Bool {
+        guard let session = closedSpotlightSession else {
+            return false
+        }
+        return model.codexOperationalStatus(for: session).requiresUserAction
     }
 
     /// Scout icon tint: blue if any running, green if any live, else gray.
@@ -178,7 +195,7 @@ struct IslandPanelView: View {
     private var expansionWidth: CGFloat {
         guard !showsIdleEdgeWhenCollapsed else { return 0 }
         guard hasClosedPresence else { return 0 }
-        let hasPending = closedSpotlightSession?.phase.requiresAttention == true
+        let hasPending = closedSpotlightNeedsAction
         let leftWidth = sideWidth + 8 + (hasPending ? 18 : 0)
         let rightWidth = max(sideWidth, countBadgeWidth) + (hasPending ? 18 : 0)
         return leftWidth + rightWidth + 16 + (hasPending ? 6 : 0)
@@ -376,14 +393,14 @@ struct IslandPanelView: View {
                                 .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: true)
                         }
 
-                        if closedSpotlightSession?.phase.requiresAttention == true {
+                        if closedSpotlightNeedsAction {
                             AttentionIndicator(
                                 size: 14,
                                 color: phaseColor(closedSpotlightSession?.phase ?? .running)
                             )
                         }
                     }
-                    .frame(width: sideWidth + 8 + (closedSpotlightSession?.phase.requiresAttention == true ? 18 : 0))
+                    .frame(width: sideWidth + 8 + (closedSpotlightNeedsAction ? 18 : 0))
                 }
 
                 if !hasClosedPresence {
@@ -404,10 +421,10 @@ struct IslandPanelView: View {
                 }
 
                 if hasClosedPresence {
-                    let attentionBalanceWidth: CGFloat = closedSpotlightSession?.phase.requiresAttention == true ? 18 : 0
+                    let attentionBalanceWidth: CGFloat = closedSpotlightNeedsAction ? 18 : 0
                     ClosedCountBadge(
                         liveCount: model.liveSessionCount,
-                        tint: closedSpotlightSession?.phase.requiresAttention == true ? .orange : scoutTint
+                        tint: closedSpotlightNeedsAction ? .orange : scoutTint
                     )
                     .matchedGeometryEffect(id: "right-indicator", in: notchNamespace, isSource: true)
                     .frame(width: max(sideWidth, countBadgeWidth) + attentionBalanceWidth)
@@ -505,6 +522,9 @@ struct IslandPanelView: View {
             } else if model.islandListSessions.isEmpty {
                 emptyState
             } else {
+                if !model.codexRadarProjects.isEmpty {
+                    codexRadarPanel
+                }
                 sessionList
             }
         }
@@ -635,6 +655,7 @@ struct IslandPanelView: View {
                 IslandSessionRow(
                     session: session,
                     referenceDate: context.date,
+                    operationalStatus: model.codexOperationalStatus(for: session, at: context.date),
                     isActionable: true,
                     useDrawingGroup: model.notchStatus == .opened,
                     isInteractive: model.notchStatus == .opened,
@@ -664,6 +685,7 @@ struct IslandPanelView: View {
                     IslandSessionRow(
                         session: session,
                         referenceDate: context.date,
+                        operationalStatus: model.codexOperationalStatus(for: session, at: context.date),
                         isActionable: session.phase.requiresAttention || session.id == actionableSessionID,
                         useDrawingGroup: model.notchStatus == .opened,
                         isInteractive: model.notchStatus == .opened,
@@ -678,6 +700,137 @@ struct IslandPanelView: View {
                 }
             }
         }
+    }
+
+    private var codexRadarPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Codex Radar")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+
+                Spacer(minLength: 8)
+
+                Text("\(model.codexRadarProjects.count) projects")
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45))
+            }
+
+            VStack(spacing: 6) {
+                ForEach(model.codexRadarProjects) { project in
+                    Button {
+                        jumpToRadarProject(project)
+                    } label: {
+                        radarProjectRow(project)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
+    }
+
+    private func radarProjectRow(_ project: AppModel.CodexRadarProject) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Circle()
+                .fill(radarStatusColor(project.topStatus))
+                .frame(width: 7, height: 7)
+                .padding(.top, 5)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .top, spacing: 6) {
+                    Text(project.projectName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.94))
+                        .lineLimit(1)
+
+                    Spacer(minLength: 6)
+
+                    Text(radarAgeLabel(project.updatedAt))
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.42))
+                }
+
+                HStack(spacing: 5) {
+                    radarPill(project.topStatus.label, tint: radarStatusColor(project.topStatus))
+                    radarPill("Run \(project.runningTaskCount)", tint: .white.opacity(0.58))
+                    if project.actionableTaskCount > 0 {
+                        radarPill("Need \(project.actionableTaskCount)", tint: .orange.opacity(0.86))
+                    }
+                }
+
+                Text(project.latestSummary)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.56))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.03))
+        )
+    }
+
+    private func radarPill(_ text: String, tint: Color) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color.black.opacity(0.36), in: Capsule())
+    }
+
+    private func radarStatusColor(_ status: CodexOperationalStatus) -> Color {
+        switch status {
+        case .waitingApproval:
+            .orange
+        case .waitingInput:
+            .yellow
+        case .reconnecting, .connecting:
+            Color(red: 0.45, green: 0.70, blue: 0.99)
+        case .interrupted:
+            Color(red: 0.98, green: 0.47, blue: 0.36)
+        case .detached:
+            Color(red: 0.92, green: 0.62, blue: 0.34)
+        case .stalled, .loopSuspected:
+            Color(red: 0.78, green: 0.70, blue: 0.35)
+        case .running:
+            Color(red: 0.34, green: 0.61, blue: 0.99)
+        case .recentlyCompleted, .completed:
+            Color(red: 0.29, green: 0.86, blue: 0.46)
+        }
+    }
+
+    private func radarAgeLabel(_ updatedAt: Date) -> String {
+        let age = max(0, Int(Date.now.timeIntervalSince(updatedAt)))
+        if age < 60 {
+            return "<1m"
+        }
+        if age < 3_600 {
+            return "\(max(1, age / 60))m"
+        }
+        if age < 86_400 {
+            return "\(max(1, age / 3_600))h"
+        }
+        return "\(max(1, age / 86_400))d"
+    }
+
+    private func jumpToRadarProject(_ project: AppModel.CodexRadarProject) {
+        guard let session = model.allSessions.first(where: { $0.id == project.primarySessionID }) else {
+            return
+        }
+        model.jumpToSession(session)
     }
 
     // MARK: - Helpers
@@ -1093,6 +1246,7 @@ private struct OpenedHeaderMetrics {
 private struct IslandSessionRow: View {
     let session: AgentSession
     let referenceDate: Date
+    let operationalStatus: CodexOperationalStatus
     var isActionable: Bool = false
     var useDrawingGroup: Bool = true
     var isInteractive: Bool = true
@@ -1129,6 +1283,7 @@ private struct IslandSessionRow: View {
                         Spacer(minLength: 8)
 
                         HStack(spacing: 6) {
+                            compactBadge(operationalStatus.label, presence: presence)
                             compactBadge(session.tool.displayName, presence: presence)
                             if session.isRemote {
                                 compactBadge("SSH", presence: presence, icon: "network")
@@ -1152,7 +1307,9 @@ private struct IslandSessionRow: View {
                     }
 
                     if showsExpandedContent || isActionable,
-                       let activityLine = session.spotlightActivityLineText ?? expandedActivityLineText {
+                       let activityLine = statusActivityLineOverride
+                       ?? session.spotlightActivityLineText
+                       ?? expandedActivityLineText {
                         Text(activityLine)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(activityColor(for: presence).opacity(0.94))
@@ -1280,14 +1437,22 @@ private struct IslandSessionRow: View {
     }
 
     private var actionableStatusTint: Color {
-        switch session.phase {
-        case .waitingForApproval:
+        switch operationalStatus {
+        case .waitingApproval:
             .orange
-        case .waitingForAnswer:
+        case .waitingInput:
             .yellow
+        case .connecting, .reconnecting:
+            Color(red: 0.45, green: 0.70, blue: 0.99)
+        case .interrupted:
+            Color(red: 0.98, green: 0.47, blue: 0.36)
+        case .detached:
+            Color(red: 0.92, green: 0.62, blue: 0.34)
+        case .stalled, .loopSuspected:
+            Color(red: 0.75, green: 0.68, blue: 0.33)
         case .running:
             Color(red: 0.34, green: 0.61, blue: 0.99)
-        case .completed:
+        case .recentlyCompleted, .completed:
             Color(red: 0.29, green: 0.86, blue: 0.46)
         }
     }
@@ -1551,6 +1716,25 @@ private struct IslandSessionRow: View {
         return session.jumpTarget != nil ? "Ready" : "Completed"
     }
 
+    private var statusActivityLineOverride: String? {
+        switch operationalStatus {
+        case .connecting:
+            "Connecting to runtime."
+        case .reconnecting:
+            "Reconnecting to runtime."
+        case .interrupted:
+            "Last turn was interrupted."
+        case .detached:
+            "Session detached from terminal/thread."
+        case .stalled:
+            "No new events for a while."
+        case .loopSuspected:
+            "Repeated command or failure pattern."
+        case .waitingApproval, .waitingInput, .running, .recentlyCompleted, .completed:
+            nil
+        }
+    }
+
     private func handlePrimaryTap() {
         let rawPresence = session.islandPresence(at: referenceDate)
         if rawPresence == .inactive && !isManuallyExpanded {
@@ -1590,12 +1774,21 @@ private struct IslandSessionRow: View {
     }
 
     private func statusTint(for presence: IslandSessionPresence) -> Color {
-        if session.phase == .waitingForApproval {
+        switch operationalStatus {
+        case .waitingApproval:
             return .orange.opacity(0.94)
-        }
-
-        if session.phase == .waitingForAnswer {
+        case .waitingInput:
             return .yellow.opacity(0.96)
+        case .connecting, .reconnecting:
+            return Color(red: 0.45, green: 0.70, blue: 0.99).opacity(0.95)
+        case .interrupted:
+            return Color(red: 0.98, green: 0.47, blue: 0.36).opacity(0.96)
+        case .detached:
+            return Color(red: 0.92, green: 0.62, blue: 0.34).opacity(0.9)
+        case .stalled, .loopSuspected:
+            return Color(red: 0.78, green: 0.70, blue: 0.35).opacity(0.82)
+        case .running, .recentlyCompleted, .completed:
+            break
         }
 
         switch presence {
@@ -1609,7 +1802,11 @@ private struct IslandSessionRow: View {
     }
 
     private func activityColor(for presence: IslandSessionPresence) -> Color {
-        switch session.spotlightActivityTone {
+        if operationalStatus == .stalled || operationalStatus == .loopSuspected {
+            return Color(red: 0.78, green: 0.70, blue: 0.35).opacity(0.72)
+        }
+
+        return switch session.spotlightActivityTone {
         case .attention:
             .orange.opacity(0.94)
         case .live:

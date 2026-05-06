@@ -144,6 +144,9 @@ private enum DebugSessionFactory {
     static func listSessions(now: Date) -> [AgentSession] {
         [
             runningSession(now: now),
+            stalledSession(now: now),
+            interruptedSession(now: now),
+            detachedSession(now: now),
             recentCompletedSession(now: now),
             inactiveSession(
                 id: "session-claude-research",
@@ -248,7 +251,7 @@ private enum DebugSessionFactory {
     }
 
     static func recentCompletedSession(now: Date) -> AgentSession {
-        AgentSession(
+        var session = AgentSession(
             id: "session-recent",
             title: "Codex · open-agent-sdk",
             tool: .codex,
@@ -268,6 +271,83 @@ private enum DebugSessionFactory {
                 initialUserPrompt: "读一下这篇论文 https://arxiv.org/html/2603.28052",
                 lastUserPrompt: "读一下这篇论文 https://arxiv.org/html/2603.28052v1 感觉和我们在做的 agent 很像。",
                 lastAssistantMessage: "整理完了，已经提炼出和 autoreserach 相关的几段关键差异。"
+            )
+        )
+        session.isProcessAlive = true
+        return session
+    }
+
+    static func stalledSession(now: Date) -> AgentSession {
+        var session = AgentSession(
+            id: "session-stalled",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .demo,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "No new events for a while.",
+            updatedAt: now.addingTimeInterval(-16 * 60),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "open-island",
+                paneTitle: "codex ~/Personal/open-island",
+                workingDirectory: "/Users/wangruobing/Personal/open-island",
+                terminalSessionID: "ghostty-stalled"
+            ),
+            codexMetadata: CodexSessionMetadata(
+                initialUserPrompt: "继续实现异常状态识别。",
+                lastUserPrompt: "Stalled 阈值先保守一点。",
+                lastAssistantMessage: "正在等待新的事件。",
+                currentTool: "exec_command",
+                currentCommandPreview: "swift build --product OpenIslandApp"
+            )
+        )
+        session.isProcessAlive = true
+        return session
+    }
+
+    static func interruptedSession(now: Date) -> AgentSession {
+        var session = AgentSession(
+            id: "session-interrupted",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .demo,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Turn interrupted.",
+            updatedAt: now.addingTimeInterval(-7 * 60),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "open-island",
+                paneTitle: "codex ~/Personal/open-island",
+                workingDirectory: "/Users/wangruobing/Personal/open-island",
+                terminalSessionID: "ghostty-interrupted"
+            ),
+            codexMetadata: CodexSessionMetadata(
+                initialUserPrompt: "实现 reconnecting 状态。",
+                lastUserPrompt: "这轮先停一下。",
+                lastAssistantMessage: "执行被中断。"
+            )
+        )
+        session.lastTurnInterrupted = true
+        session.isProcessAlive = true
+        return session
+    }
+
+    static func detachedSession(now: Date) -> AgentSession {
+        AgentSession(
+            id: "session-detached",
+            title: "Codex · detached-repo",
+            tool: .codex,
+            origin: .demo,
+            attachmentState: .detached,
+            phase: .running,
+            summary: "Session detached from terminal/thread.",
+            updatedAt: now.addingTimeInterval(-90),
+            codexMetadata: CodexSessionMetadata(
+                initialUserPrompt: "检查 detached 状态。",
+                lastUserPrompt: "会话绑定丢失时应该提示。",
+                lastAssistantMessage: "已进入 detached 弱警示。"
             )
         )
     }
