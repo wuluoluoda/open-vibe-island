@@ -573,6 +573,9 @@ final class AppModel {
     @ObservationIgnored
     private let isNotificationSessionAlreadyFrontmost: @Sendable (AgentSession) async -> Bool
 
+    @ObservationIgnored
+    private let codexShelfFileActions: CodexShelfFileActioning
+
 
     @ObservationIgnored
     var harnessRuntimeMonitor: HarnessRuntimeMonitor?
@@ -590,10 +593,12 @@ final class AppModel {
         },
         isNotificationSessionAlreadyFrontmost: @escaping @Sendable (AgentSession) async -> Bool = { session in
             await ForegroundTerminalSessionProbe().matches(session: session)
-        }
+        },
+        codexShelfFileActions: CodexShelfFileActioning = WorkspaceCodexShelfFileActions()
     ) {
         self.terminalJumpAction = terminalJumpAction
         self.isNotificationSessionAlreadyFrontmost = isNotificationSessionAlreadyFrontmost
+        self.codexShelfFileActions = codexShelfFileActions
         UserDefaults.standard.register(defaults: [
             Self.showDockIconDefaultsKey: true,
             Self.hapticFeedbackEnabledDefaultsKey: false,
@@ -1290,7 +1295,7 @@ final class AppModel {
             return
         }
 
-        if NSWorkspace.shared.open(fileURL) {
+        if codexShelfFileActions.openFile(at: fileURL) {
             lastActionMessage = "Opened \(item.fileName)."
         } else {
             lastActionMessage = "Failed to open \(item.fileName)."
@@ -1301,16 +1306,22 @@ final class AppModel {
         let fileURL = URL(fileURLWithPath: item.path).standardizedFileURL
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: fileURL.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([fileURL])
-            lastActionMessage = "Revealed \(item.fileName) in Finder."
+            if codexShelfFileActions.revealFile(at: fileURL) {
+                lastActionMessage = "Revealed \(item.fileName) in Finder."
+            } else {
+                lastActionMessage = "Failed to reveal \(item.fileName) in Finder."
+            }
             return
         }
 
         codexShelfByPath.removeValue(forKey: fileURL.path.lowercased())
         let directoryURL = fileURL.deletingLastPathComponent()
         if fileManager.fileExists(atPath: directoryURL.path) {
-            NSWorkspace.shared.open(directoryURL)
-            lastActionMessage = "Opened containing folder for \(item.fileName)."
+            if codexShelfFileActions.openDirectory(at: directoryURL) {
+                lastActionMessage = "Opened containing folder for \(item.fileName)."
+            } else {
+                lastActionMessage = "Failed to open containing folder for \(item.fileName)."
+            }
             return
         }
 

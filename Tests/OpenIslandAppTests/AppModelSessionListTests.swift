@@ -1187,4 +1187,78 @@ struct AppModelSessionListTests {
         #expect(radar.first?.projectName == "radar-repo")
         #expect(radar.first?.topStatus == .running)
     }
+
+    @Test
+    func openShelfItemInvokesConfiguredFileAction() throws {
+        let fileURL = try makeTemporaryShelfFile(named: "codex-shelf-open.txt")
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+
+        let actions = FakeCodexShelfFileActions()
+        let model = AppModel(codexShelfFileActions: actions)
+        let item = shelfItem(path: fileURL.path)
+
+        model.openShelfItem(item)
+
+        #expect(actions.openedFiles == [fileURL.standardizedFileURL])
+        #expect(model.lastActionMessage == "Opened codex-shelf-open.txt.")
+    }
+
+    @Test
+    func revealShelfItemInvokesConfiguredFinderAction() throws {
+        let fileURL = try makeTemporaryShelfFile(named: "codex-shelf-reveal.txt")
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+
+        let actions = FakeCodexShelfFileActions()
+        let model = AppModel(codexShelfFileActions: actions)
+        let item = shelfItem(path: fileURL.path)
+
+        model.revealShelfItemInFinder(item)
+
+        #expect(actions.revealedFiles == [fileURL.standardizedFileURL])
+        #expect(model.lastActionMessage == "Revealed codex-shelf-reveal.txt in Finder.")
+    }
+
+    private func makeTemporaryShelfFile(named name: String) throws -> URL {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        let fileURL = directoryURL.appendingPathComponent(name)
+        FileManager.default.createFile(atPath: fileURL.path, contents: Data("shelf".utf8))
+        return fileURL
+    }
+
+    private func shelfItem(path: String) -> CodexShelfItem {
+        CodexShelfItem(
+            id: path.lowercased(),
+            path: path,
+            fileName: URL(fileURLWithPath: path).lastPathComponent,
+            artifactType: .code,
+            projectName: "open-vibe-island",
+            sourceSessionID: "codex-session",
+            discoveredAt: Date(timeIntervalSince1970: 5_000),
+            modifiedAt: Date(timeIntervalSince1970: 5_000)
+        )
+    }
+}
+
+@MainActor
+private final class FakeCodexShelfFileActions: CodexShelfFileActioning, @unchecked Sendable {
+    var openedFiles: [URL] = []
+    var revealedFiles: [URL] = []
+    var openedDirectories: [URL] = []
+
+    func openFile(at url: URL) -> Bool {
+        openedFiles.append(url)
+        return true
+    }
+
+    func revealFile(at url: URL) -> Bool {
+        revealedFiles.append(url)
+        return true
+    }
+
+    func openDirectory(at url: URL) -> Bool {
+        openedDirectories.append(url)
+        return true
+    }
 }

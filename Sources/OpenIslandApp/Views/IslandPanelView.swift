@@ -833,28 +833,26 @@ struct IslandPanelView: View {
 
             Spacer(minLength: 6)
 
-            Button {
+            shelfActionButton(systemName: "arrow.up.right.square") {
                 model.openShelfItem(item)
-            } label: {
-                Image(systemName: "arrow.up.right.square")
-                    .font(.system(size: 9.5, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .frame(width: 18, height: 18)
-                    .background(Color.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
-            .buttonStyle(.plain)
 
-            Button {
+            shelfActionButton(systemName: "folder") {
                 model.revealShelfItemInFinder(item)
-            } label: {
-                Image(systemName: "folder")
-                    .font(.system(size: 9.5, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .frame(width: 18, height: 18)
-                    .background(Color.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
-            .buttonStyle(.plain)
         }
+    }
+
+    private func shelfActionButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.68))
+                .frame(width: 24, height: 24)
+                .background(Color.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.borderless)
     }
 
     private func radarProjectRow(_ project: AppModel.CodexRadarProject, referenceDate: Date) -> some View {
