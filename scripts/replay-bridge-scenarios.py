@@ -16,11 +16,12 @@ import os
 import socket
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
 
-SCENARIOS = ("approval", "question", "completion", "all")
+SCENARIOS = ("approval", "question", "question-hook", "completion", "all")
 DEFAULT_FIRE_AND_FORGET_PAUSE = 0.15
 DEFAULT_HOLD_TIMEOUT = 0.0
 
@@ -120,6 +121,72 @@ def process_opencode_hook(payload: dict[str, Any]) -> dict[str, Any]:
     return command_envelope({"type": "processOpenCodeHook", "openCodeHook": payload})
 
 
+def request_question(session_id: str, title: str, questions: list[dict[str, Any]]) -> dict[str, Any]:
+    resolved_questions = []
+    flat_options = []
+    for question in questions:
+        resolved_options = []
+        for option in question.get("options", []):
+            label = option["label"]
+            flat_options.append(label)
+            resolved_options.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "label": label,
+                    "description": option.get("description", ""),
+                    "allowsFreeform": option.get("allows_freeform", False),
+                }
+            )
+
+        resolved_questions.append(
+            {
+                "question": question["question"],
+                "header": question.get("header", "Question"),
+                "options": resolved_options,
+                "multiSelect": question.get("multi_select", False),
+            }
+        )
+
+    return command_envelope(
+        {
+            "type": "requestQuestion",
+            "sessionID": session_id,
+            "prompt": {
+                "id": str(uuid.uuid4()),
+                "title": title,
+                "options": flat_options,
+                "questions": resolved_questions,
+            },
+        }
+    )
+
+
+def replay_question_prompt() -> tuple[str, list[dict[str, Any]]]:
+    title = "Which notification treatment should this session use?"
+    questions = [
+        {
+            "question": title,
+            "header": "Notification",
+            "options": [
+                {
+                    "label": "Inline choices",
+                    "description": "Answer directly in the island",
+                },
+                {
+                    "label": "Jump back",
+                    "description": "Return to the terminal before answering",
+                },
+                {
+                    "label": "Other",
+                    "description": "Type a custom reply",
+                    "allows_freeform": True,
+                },
+            ],
+        }
+    ]
+    return title, questions
+
+
 def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any], bool, bool]]:
     if scenario == "approval":
         session_id = "open-island-replay-approval"
@@ -161,6 +228,7 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
 
     if scenario == "question":
         session_id = "open-island-replay-question"
+        question_title, questions = replay_question_prompt()
         return [
             (
                 "opencode session start",
@@ -182,34 +250,45 @@ def scenario_commands(scenario: str, cwd: str) -> list[tuple[str, dict[str, Any]
                 False,
             ),
             (
-                "opencode question",
+                "bridge question",
+                request_question(session_id, question_title, questions),
+                True,
+                False,
+            ),
+        ]
+
+    if scenario == "question-hook":
+        session_id = "open-island-replay-question-hook"
+        question_title, questions = replay_question_prompt()
+        return [
+            (
+                "opencode session start",
+                process_opencode_hook(opencode_payload("SessionStart", session_id, cwd=cwd)),
+                True,
+                False,
+            ),
+            (
+                "opencode prompt",
+                process_opencode_hook(
+                    opencode_payload(
+                        "UserPromptSubmit",
+                        session_id,
+                        cwd=cwd,
+                        prompt="Replay the question notification card.",
+                    )
+                ),
+                True,
+                False,
+            ),
+            (
+                "opencode question hook",
                 process_opencode_hook(
                     opencode_payload(
                         "QuestionAsked",
                         session_id,
                         cwd=cwd,
-                        question_text="Which notification treatment should this session use?",
-                        questions=[
-                            {
-                                "question": "Which notification treatment should this session use?",
-                                "header": "Notification",
-                                "options": [
-                                    {
-                                        "label": "Inline choices",
-                                        "description": "Answer directly in the island",
-                                    },
-                                    {
-                                        "label": "Jump back",
-                                        "description": "Return to the terminal before answering",
-                                    },
-                                    {
-                                        "label": "Other",
-                                        "description": "Type a custom reply",
-                                        "allows_freeform": True,
-                                    },
-                                ],
-                            }
-                        ],
+                        question_text=question_title,
+                        questions=questions,
                     )
                 ),
                 False,
