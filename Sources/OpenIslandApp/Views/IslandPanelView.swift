@@ -821,7 +821,7 @@ struct IslandPanelView: View {
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.86))
                     .lineLimit(1)
-                Text("\(item.artifactType.label) · \(radarAgeLabel(item.modifiedAt, referenceDate: referenceDate)) · \(model.codexShelfSourceLabel(for: item))")
+                Text("\(item.source.label) · \(item.artifactType.label) · \(radarAgeLabel(item.modifiedAt, referenceDate: referenceDate)) · \(model.codexShelfSourceLabel(for: item))")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.white.opacity(0.46))
                     .lineLimit(1)

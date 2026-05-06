@@ -886,7 +886,7 @@ struct AppModelSessionListTests {
     }
 
     @Test
-    func codexShelfTracksExistingArtifactsFromRelativePaths() throws {
+    func codexShelfIgnoresReferencedPathsThatWereNotChangedByCodex() throws {
         let now = Date(timeIntervalSince1970: 3_900)
         let model = AppModel()
         let fileManager = FileManager.default
@@ -931,12 +931,122 @@ struct AppModelSessionListTests {
             )
         )
 
+        #expect(model.codexShelfItems.isEmpty)
+    }
+
+    @Test
+    func codexShelfTracksFilesModifiedAfterSessionBaseline() throws {
+        let now = Date(timeIntervalSince1970: 3_920)
+        let model = AppModel()
+        let fileManager = FileManager.default
+
+        let workspaceURL = fileManager.temporaryDirectory
+            .appendingPathComponent("open-island-shelf-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: workspaceURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: workspaceURL) }
+
+        let fileURL = workspaceURL.appendingPathComponent("Sources/ShelfFeature.swift")
+        try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "struct ShelfFeature {}".write(to: fileURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes(
+            [.modificationDate: now.addingTimeInterval(-60)],
+            ofItemAtPath: fileURL.path
+        )
+
+        model.applyTrackedEvent(
+            .sessionStarted(
+                SessionStarted(
+                    sessionID: "codex-shelf-session",
+                    title: "Codex · shelf-project",
+                    tool: .codex,
+                    origin: .live,
+                    summary: "Working on shelf panel",
+                    timestamp: now,
+                    jumpTarget: JumpTarget(
+                        terminalApp: "Ghostty",
+                        workspaceName: "shelf-project",
+                        paneTitle: "codex ~/shelf-project",
+                        workingDirectory: workspaceURL.path
+                    )
+                )
+            )
+        )
+
+        try "struct ShelfFeature { let value = 1 }".write(to: fileURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes(
+            [.modificationDate: now.addingTimeInterval(30)],
+            ofItemAtPath: fileURL.path
+        )
+
+        model.applyTrackedEvent(
+            .activityUpdated(
+                SessionActivityUpdated(
+                    sessionID: "codex-shelf-session",
+                    summary: "Finished the shelf model update.",
+                    phase: .running,
+                    timestamp: now.addingTimeInterval(31)
+                )
+            )
+        )
+
         let shelfItems = model.codexShelfItems
         #expect(shelfItems.count == 1)
         #expect(shelfItems.first?.fileName == "ShelfFeature.swift")
         #expect(shelfItems.first?.artifactType == .code)
+        #expect(shelfItems.first?.source == .modified)
         #expect(shelfItems.first?.projectName == "shelf-project")
         #expect(shelfItems.first?.path == fileURL.standardizedFileURL.path)
+    }
+
+    @Test
+    func codexShelfHidesDebugLogsByDefault() throws {
+        let now = Date(timeIntervalSince1970: 3_930)
+        let model = AppModel()
+        let fileManager = FileManager.default
+
+        let workspaceURL = fileManager.temporaryDirectory
+            .appendingPathComponent("open-island-shelf-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: workspaceURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: workspaceURL) }
+
+        model.applyTrackedEvent(
+            .sessionStarted(
+                SessionStarted(
+                    sessionID: "codex-shelf-debug",
+                    title: "Codex · shelf-project",
+                    tool: .codex,
+                    origin: .live,
+                    summary: "Working on shelf panel",
+                    timestamp: now,
+                    jumpTarget: JumpTarget(
+                        terminalApp: "Ghostty",
+                        workspaceName: "shelf-project",
+                        paneTitle: "codex ~/shelf-project",
+                        workingDirectory: workspaceURL.path
+                    )
+                )
+            )
+        )
+
+        let logURL = workspaceURL.appendingPathComponent("debug.log")
+        try "debug".write(to: logURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes(
+            [.modificationDate: now.addingTimeInterval(10)],
+            ofItemAtPath: logURL.path
+        )
+
+        model.applyTrackedEvent(
+            .activityUpdated(
+                SessionActivityUpdated(
+                    sessionID: "codex-shelf-debug",
+                    summary: "Collected debug output.",
+                    phase: .running,
+                    timestamp: now.addingTimeInterval(11)
+                )
+            )
+        )
+
+        #expect(model.codexShelfItems.isEmpty)
     }
 
     @Test
@@ -1001,32 +1111,43 @@ struct AppModelSessionListTests {
         let fileURL = workspaceURL.appendingPathComponent("main.swift")
         try "print(\"hello\")".write(to: fileURL, atomically: true, encoding: .utf8)
 
-        var session = AgentSession(
-            id: "codex-shelf-toggle",
-            title: "Codex · shelf-project",
-            tool: .codex,
-            origin: .live,
-            attachmentState: .attached,
-            phase: .running,
-            summary: "Working on docs",
-            updatedAt: now,
-            jumpTarget: JumpTarget(
-                terminalApp: "Ghostty",
-                workspaceName: "shelf-project",
-                paneTitle: "codex ~/shelf-project",
-                workingDirectory: workspaceURL.path
+        try fileManager.setAttributes(
+            [.modificationDate: now.addingTimeInterval(-60)],
+            ofItemAtPath: fileURL.path
+        )
+
+        model.applyTrackedEvent(
+            .sessionStarted(
+                SessionStarted(
+                    sessionID: "codex-shelf-toggle",
+                    title: "Codex · shelf-project",
+                    tool: .codex,
+                    origin: .live,
+                    summary: "Working on docs",
+                    timestamp: now,
+                    jumpTarget: JumpTarget(
+                        terminalApp: "Ghostty",
+                        workspaceName: "shelf-project",
+                        paneTitle: "codex ~/shelf-project",
+                        workingDirectory: workspaceURL.path
+                    )
+                )
             )
         )
-        session.isProcessAlive = true
-        model.state = SessionState(sessions: [session])
+
+        try "print(\"updated\")".write(to: fileURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes(
+            [.modificationDate: now.addingTimeInterval(10)],
+            ofItemAtPath: fileURL.path
+        )
 
         model.applyTrackedEvent(
             .activityUpdated(
                 SessionActivityUpdated(
-                    sessionID: session.id,
-                    summary: "Updated main.swift",
+                    sessionID: "codex-shelf-toggle",
+                    summary: "Finished updating code.",
                     phase: .running,
-                    timestamp: now.addingTimeInterval(1)
+                    timestamp: now.addingTimeInterval(11)
                 )
             )
         )
@@ -1233,6 +1354,7 @@ struct AppModelSessionListTests {
             path: path,
             fileName: URL(fileURLWithPath: path).lastPathComponent,
             artifactType: .code,
+            source: .modified,
             projectName: "open-vibe-island",
             sourceSessionID: "codex-session",
             discoveredAt: Date(timeIntervalSince1970: 5_000),

@@ -559,6 +559,9 @@ final class AppModel {
     private var codexShelfByPath: [String: CodexShelfItem] = [:]
 
     @ObservationIgnored
+    private var codexShelfWorkspaceSnapshotsBySessionID: [String: [String: Date]] = [:]
+
+    @ObservationIgnored
     private var hasStarted = false
 
     @ObservationIgnored
@@ -860,7 +863,10 @@ final class AppModel {
         }
 
         let existingPaths = codexShelfByPath.values
-            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .filter {
+                $0.source.isVisibleByDefault
+                    && FileManager.default.fileExists(atPath: $0.path)
+            }
 
         return existingPaths.sorted { lhs, rhs in
             if lhs.modifiedAt == rhs.modifiedAt {
@@ -1621,53 +1627,72 @@ final class AppModel {
         guard codexShelfEnabled,
               let sessionID,
               let session = state.session(id: sessionID),
-              session.tool == .codex else {
+              session.tool == .codex,
+              let workingDirectory = session.jumpTarget?.workingDirectory,
+              !workingDirectory.isEmpty else {
             return
         }
 
-        let candidates = CodexShelfPathExtractor.extractCandidatePaths(from: event, session: session)
-        guard !candidates.isEmpty else {
+        let currentSnapshot = codexShelfWorkspaceSnapshot(workingDirectory: workingDirectory)
+        guard !currentSnapshot.isEmpty else {
             return
         }
 
-        let workingDirectory = session.jumpTarget?.workingDirectory
+        guard let previousSnapshot = codexShelfWorkspaceSnapshotsBySessionID[session.id] else {
+            codexShelfWorkspaceSnapshotsBySessionID[session.id] = currentSnapshot
+            return
+        }
+
         let projectName = radarProjectName(for: session)
 
-        for candidate in candidates {
-            guard let resolvedPath = CodexShelfPathExtractor.resolveExistingFilePath(
-                from: candidate,
-                workingDirectory: workingDirectory
-            ) else {
+        for entry in currentSnapshot {
+            let path = entry.key
+            let modifiedAt = entry.value
+            let previousModifiedAt = previousSnapshot[path]
+            guard previousModifiedAt == nil || modifiedAt > previousModifiedAt! else {
                 continue
             }
 
+            let artifactType = CodexShelfArtifactType.infer(fromPath: path)
+            let source = codexShelfArtifactSource(
+                artifactType: artifactType,
+                existedBefore: previousModifiedAt != nil
+            )
+
             upsertCodexShelfItem(
-                atPath: resolvedPath,
+                atPath: path,
+                artifactType: artifactType,
+                source: source,
                 projectName: projectName,
                 sourceSessionID: session.id,
-                discoveredAt: session.updatedAt
+                discoveredAt: session.updatedAt,
+                modifiedAt: modifiedAt
             )
         }
 
+        codexShelfWorkspaceSnapshotsBySessionID[session.id] = currentSnapshot
         pruneCodexShelfIfNeeded()
     }
 
     private func upsertCodexShelfItem(
         atPath path: String,
+        artifactType: CodexShelfArtifactType,
+        source: CodexShelfArtifactSource,
         projectName: String,
         sourceSessionID: String,
-        discoveredAt: Date
+        discoveredAt: Date,
+        modifiedAt: Date
     ) {
         let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
         let storageKey = normalizedPath.lowercased()
-        let modifiedAt = fileModificationDate(atPath: normalizedPath) ?? discoveredAt
         let existing = codexShelfByPath[storageKey]
 
         codexShelfByPath[storageKey] = CodexShelfItem(
             id: storageKey,
             path: normalizedPath,
             fileName: URL(fileURLWithPath: normalizedPath).lastPathComponent,
-            artifactType: CodexShelfArtifactType.infer(fromPath: normalizedPath),
+            artifactType: artifactType,
+            source: source,
             projectName: projectName,
             sourceSessionID: sourceSessionID,
             discoveredAt: existing?.discoveredAt ?? discoveredAt,
@@ -1675,11 +1700,74 @@ final class AppModel {
         )
     }
 
-    private func fileModificationDate(atPath path: String) -> Date? {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
-            return nil
+    private func codexShelfArtifactSource(
+        artifactType: CodexShelfArtifactType,
+        existedBefore: Bool
+    ) -> CodexShelfArtifactSource {
+        switch artifactType {
+        case .log:
+            return .debug
+        case .document, .image, .patch, .report:
+            return .generated
+        case .code, .generic:
+            return existedBefore ? .modified : .created
         }
-        return attributes[.modificationDate] as? Date
+    }
+
+    private func codexShelfWorkspaceSnapshot(workingDirectory: String) -> [String: Date] {
+        let rootURL = URL(fileURLWithPath: workingDirectory).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: rootURL.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            return [:]
+        }
+
+        let resourceKeys: Set<URLResourceKey> = [
+            .contentModificationDateKey,
+            .isDirectoryKey,
+            .isRegularFileKey,
+            .nameKey
+        ]
+        guard let enumerator = FileManager.default.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: Array(resourceKeys),
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return [:]
+        }
+
+        var snapshot: [String: Date] = [:]
+        let skippedDirectories: Set<String> = [
+            ".build", ".git", ".swiftpm", "Build", "DerivedData", "Pods",
+            "node_modules", "dist", "coverage"
+        ]
+        let maxSnapshotFiles = 6_000
+
+        for case let fileURL as URL in enumerator {
+            guard snapshot.count < maxSnapshotFiles else {
+                break
+            }
+
+            guard let values = try? fileURL.resourceValues(forKeys: resourceKeys) else {
+                continue
+            }
+
+            if values.isDirectory == true {
+                if let name = values.name, skippedDirectories.contains(name) {
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
+
+            guard values.isRegularFile == true,
+                  let modifiedAt = values.contentModificationDate else {
+                continue
+            }
+
+            snapshot[fileURL.standardizedFileURL.path] = modifiedAt
+        }
+
+        return snapshot
     }
 
     private func pruneCodexShelfIfNeeded() {

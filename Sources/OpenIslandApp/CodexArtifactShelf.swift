@@ -80,11 +80,44 @@ enum CodexShelfArtifactType: String, Equatable, Sendable {
     }
 }
 
+enum CodexShelfArtifactSource: String, Equatable, Sendable {
+    case created
+    case modified
+    case generated
+    case debug
+    case referenced
+
+    var label: String {
+        switch self {
+        case .created:
+            "Created"
+        case .modified:
+            "Modified"
+        case .generated:
+            "Generated"
+        case .debug:
+            "Debug Log"
+        case .referenced:
+            "Referenced"
+        }
+    }
+
+    var isVisibleByDefault: Bool {
+        switch self {
+        case .created, .modified, .generated:
+            true
+        case .debug, .referenced:
+            false
+        }
+    }
+}
+
 struct CodexShelfItem: Identifiable, Equatable, Sendable {
     let id: String
     let path: String
     let fileName: String
     let artifactType: CodexShelfArtifactType
+    let source: CodexShelfArtifactSource
     let projectName: String
     let sourceSessionID: String
     let discoveredAt: Date
