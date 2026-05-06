@@ -87,6 +87,9 @@ See [docs/worktree-workflow.md](/Users/wangruobing/Personal/open-island/docs/wor
 
 - Run targeted checks that match the change.
 - If no automated verification exists yet, state that explicitly in the final summary and still commit the change.
+- After a verified integration checkpoint that may be used for builds, create an annotated Git tag on the exact commit using a non-release prefix such as `build/<topic>-YYYYMMDD-<shortsha>`.
+- If the checkpoint is intended to be a precise product version or release version, ask the user before creating a version tag such as `v1.0.30`.
+- In final summaries, include the tag name when a tag is created, and distinguish build checkpoint tags from release/version tags.
 
 ## Default Expectation
 
@@ -96,3 +99,4 @@ Unless the user says otherwise, the agent should finish each completed round in 
 2. verify
 3. summarize
 4. commit
+5. tag verified build checkpoints when applicable
