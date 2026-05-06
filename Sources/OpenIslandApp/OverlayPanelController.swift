@@ -21,7 +21,7 @@ final class OverlayPanelController {
     private static let codexPanelHeaderContentSpacing: CGFloat = 8
     private static let codexPanelInnerRowSpacing: CGFloat = 6
     private static let codexShelfProjectBaseHeight: CGFloat = 44
-    private static let codexShelfItemRowHeight: CGFloat = 22
+    private static let codexShelfItemRowHeight: CGFloat = 24
     // Content padding top (8) + scroll padding (4) + outerBottomPadding (14) + header-content gap (12)
     // + bottomInset (14, the VStack .padding(.bottom, bottomInset) that subtracts from usable height)
     // = 52.  The extra 14 pt avoids the card bottom being clipped by the .clipped() modifier when
