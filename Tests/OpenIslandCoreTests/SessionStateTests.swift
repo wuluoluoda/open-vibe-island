@@ -390,7 +390,8 @@ struct SessionStateTests {
 
         #expect(recentCompleted.isVisibleInIsland(at: now))
         #expect(!expiredCompleted.isVisibleInIsland(at: now))
-        #expect(state.removeInvisibleSessions(at: now))
+        let removedInvisibleSessions = state.removeInvisibleSessions(at: now)
+        #expect(removedInvisibleSessions)
         #expect(state.session(id: "recent-completed") != nil)
         #expect(state.session(id: "expired-completed") == nil)
     }
