@@ -113,7 +113,8 @@ extension AgentSession {
     /// Trigger conditions:
     /// - `connecting/reconnecting`: Codex.app app-server or local bridge is in
     ///   a connecting state while this session is running and recently active.
-    /// - `interrupted`: latest completed turn is explicitly marked interrupted.
+    /// - `interrupted`: latest completed turn is explicitly marked interrupted
+    ///   and the current completion summary still describes an interruption.
     /// - `detached`: session exists but terminal/thread attachment is lost.
     /// - `stalled`: running + process alive + no event update for threshold.
     /// - `loopSuspected`: repeated same command/failure fingerprint crossed
@@ -130,7 +131,7 @@ extension AgentSession {
             break
         }
 
-        if phase == .completed && lastTurnInterrupted {
+        if phase == .completed && lastTurnInterrupted && summarySuggestsInterruption(summary) {
             return .interrupted
         }
 
@@ -224,5 +225,13 @@ extension AgentSession {
         }
 
         return signals.now.timeIntervalSince(updatedAt) >= signals.stalledThreshold
+    }
+
+    private func summarySuggestsInterruption(_ summary: String) -> Bool {
+        let normalized = summary.lowercased()
+        return normalized.contains("interrupted")
+            || normalized.contains("aborted")
+            || normalized.contains("cancelled")
+            || normalized.contains("canceled")
     }
 }
