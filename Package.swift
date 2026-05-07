@@ -2,6 +2,28 @@
 
 import PackageDescription
 
+let commandLineToolsPath = "/Library/Developer/CommandLineTools"
+let testingFrameworksPath = "\(commandLineToolsPath)/Library/Developer/Frameworks"
+let testingLibrariesPath = "\(commandLineToolsPath)/Library/Developer/usr/lib"
+let testingMacrosPath = "\(commandLineToolsPath)/usr/lib/swift/host/plugins/testing/libTestingMacros.dylib"
+
+let swiftTestingSettings: [SwiftSetting] = [
+    .unsafeFlags([
+        "-F", testingFrameworksPath,
+        "-load-plugin-library", testingMacrosPath,
+    ]),
+]
+
+let swiftTestingLinkerSettings: [LinkerSetting] = [
+    .unsafeFlags([
+        "-F", testingFrameworksPath,
+        "-Xlinker", "-rpath",
+        "-Xlinker", testingFrameworksPath,
+        "-Xlinker", "-rpath",
+        "-Xlinker", testingLibrariesPath,
+    ]),
+]
+
 let package = Package(
     name: "OpenIsland",
     defaultLocalization: "en",
@@ -55,11 +77,15 @@ let package = Package(
         ),
         .testTarget(
             name: "OpenIslandCoreTests",
-            dependencies: ["OpenIslandCore"]
+            dependencies: ["OpenIslandCore"],
+            swiftSettings: swiftTestingSettings,
+            linkerSettings: swiftTestingLinkerSettings
         ),
         .testTarget(
             name: "OpenIslandAppTests",
-            dependencies: ["OpenIslandApp", "OpenIslandCore"]
+            dependencies: ["OpenIslandApp", "OpenIslandCore"],
+            swiftSettings: swiftTestingSettings,
+            linkerSettings: swiftTestingLinkerSettings
         ),
     ]
 )
