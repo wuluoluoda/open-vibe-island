@@ -315,6 +315,9 @@ public final class CodexRolloutDiscovery: @unchecked Sendable {
             guard let record = discoverRecord(fileURL: candidate.fileURL, modifiedAt: candidate.modifiedAt) else {
                 continue
             }
+            guard !record.session.isExpiredCompletedSession(at: now) else {
+                continue
+            }
 
             if let existing = recordsByID[record.sessionID], existing.updatedAt >= record.updatedAt {
                 continue

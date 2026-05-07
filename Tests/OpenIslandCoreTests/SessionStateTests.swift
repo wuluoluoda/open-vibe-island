@@ -360,6 +360,42 @@ struct SessionStateTests {
     }
 
     @Test
+    func completedSessionsExpireAfterTwoHoursEvenWhenProcessIsAlive() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        var recentCompleted = AgentSession(
+            id: "recent-completed",
+            title: "Recent completed",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Just finished",
+            updatedAt: now.addingTimeInterval(-7_199)
+        )
+        recentCompleted.isCodexAppSession = true
+        recentCompleted.isProcessAlive = true
+
+        var expiredCompleted = AgentSession(
+            id: "expired-completed",
+            title: "Expired completed",
+            tool: .codex,
+            attachmentState: .stale,
+            phase: .completed,
+            summary: "Finished earlier",
+            updatedAt: now.addingTimeInterval(-7_200)
+        )
+        expiredCompleted.isCodexAppSession = true
+        expiredCompleted.isProcessAlive = true
+
+        var state = SessionState(sessions: [recentCompleted, expiredCompleted])
+
+        #expect(recentCompleted.isVisibleInIsland(at: now))
+        #expect(!expiredCompleted.isVisibleInIsland(at: now))
+        #expect(state.removeInvisibleSessions(at: now))
+        #expect(state.session(id: "recent-completed") != nil)
+        #expect(state.session(id: "expired-completed") == nil)
+    }
+
+    @Test
     func bridgeEnvelopeRoundTripsThroughLineCodec() throws {
         let envelope = BridgeEnvelope.event(
             .permissionRequested(

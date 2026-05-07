@@ -62,7 +62,11 @@ public final class ClaudeTranscriptDiscovery: @unchecked Sendable {
             .prefix(maxFiles)
 
         return sortedCandidates.compactMap { candidate in
-            parseSession(at: candidate.fileURL, fallbackUpdatedAt: candidate.modifiedAt)
+            guard let session = parseSession(at: candidate.fileURL, fallbackUpdatedAt: candidate.modifiedAt),
+                  !session.isExpiredCompletedSession(at: now) else {
+                return nil
+            }
+            return session
         }
     }
 

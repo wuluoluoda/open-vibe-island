@@ -81,19 +81,35 @@ final class SessionDiscoveryCoordinator {
 
     /// Performs all startup file I/O off the main thread and returns the raw results.
     nonisolated func loadStartupDiscoveryPayload() -> StartupDiscoveryPayload {
-        let cutoff = Date.now.addingTimeInterval(-86_400)
+        let now = Date.now
+        let cutoff = now.addingTimeInterval(-86_400)
 
         let allCodex = (try? codexSessionStore.load()) ?? []
-        let codexRecords = allCodex.filter { $0.updatedAt >= cutoff && $0.shouldRestoreToLiveState }
+        let codexRecords = allCodex.filter {
+            $0.updatedAt >= cutoff
+                && $0.shouldRestoreToLiveState
+                && !$0.session.isExpiredCompletedSession(at: now)
+        }
 
         let allClaude = (try? claudeSessionRegistry.load()) ?? []
-        let claudeRecords = allClaude.filter { $0.updatedAt >= cutoff && $0.shouldRestoreToLiveState }
+        let claudeRecords = allClaude.filter {
+            $0.updatedAt >= cutoff
+                && $0.shouldRestoreToLiveState
+                && !$0.session.isExpiredCompletedSession(at: now)
+        }
 
         let allOpenCode = (try? openCodeSessionRegistry.load()) ?? []
-        let openCodeRecords = allOpenCode.filter { $0.updatedAt >= cutoff }
+        let openCodeRecords = allOpenCode.filter {
+            $0.updatedAt >= cutoff
+                && !$0.session.isExpiredCompletedSession(at: now)
+        }
 
         let allCursor = (try? cursorSessionRegistry.load()) ?? []
-        let cursorRecords = allCursor.filter { $0.updatedAt >= cutoff && $0.shouldRestoreToLiveState }
+        let cursorRecords = allCursor.filter {
+            $0.updatedAt >= cutoff
+                && $0.shouldRestoreToLiveState
+                && !$0.session.isExpiredCompletedSession(at: now)
+        }
 
         let discoveredCodex = codexRolloutDiscovery.discoverRecentSessions()
         let discoveredClaude = claudeTranscriptDiscovery.discoverRecentSessions()
@@ -450,8 +466,13 @@ final class SessionDiscoveryCoordinator {
     func scheduleCodexSessionPersistence() {
         codexSessionPersistenceTask?.cancel()
 
+        let now = Date.now
         let records = state.sessions
-            .filter { $0.isTrackedLiveCodexSession && $0.updatedAt >= Date.now.addingTimeInterval(-86_400) }
+            .filter {
+                $0.isTrackedLiveCodexSession
+                    && $0.updatedAt >= now.addingTimeInterval(-86_400)
+                    && !$0.isExpiredCompletedSession(at: now)
+            }
             .map(CodexTrackedSessionRecord.init(session:))
         let store = codexSessionStore
 
@@ -465,12 +486,14 @@ final class SessionDiscoveryCoordinator {
         claudeSessionPersistenceTask?.cancel()
 
         let prefix = syntheticClaudeSessionPrefix
+        let now = Date.now
         let records = state.sessions
             .filter {
                 $0.tool == .claudeCode
                     && $0.isTrackedLiveSession
                     && (prefix.isEmpty || !$0.id.hasPrefix(prefix))
-                    && $0.updatedAt >= Date.now.addingTimeInterval(-86_400)
+                    && $0.updatedAt >= now.addingTimeInterval(-86_400)
+                    && !$0.isExpiredCompletedSession(at: now)
                     && ($0.jumpTarget != nil || $0.claudeMetadata?.transcriptPath != nil)
             }
             .map(ClaudeTrackedSessionRecord.init(session:))
@@ -485,11 +508,13 @@ final class SessionDiscoveryCoordinator {
     func scheduleOpenCodeSessionPersistence() {
         openCodeSessionPersistenceTask?.cancel()
 
+        let now = Date.now
         let records = state.sessions
             .filter {
                 $0.tool == .openCode
                     && $0.isTrackedLiveSession
-                    && $0.updatedAt >= Date.now.addingTimeInterval(-86_400)
+                    && $0.updatedAt >= now.addingTimeInterval(-86_400)
+                    && !$0.isExpiredCompletedSession(at: now)
             }
             .map(OpenCodeTrackedSessionRecord.init(session:))
         let registry = openCodeSessionRegistry
@@ -503,11 +528,13 @@ final class SessionDiscoveryCoordinator {
     func scheduleCursorSessionPersistence() {
         cursorSessionPersistenceTask?.cancel()
 
+        let now = Date.now
         let records = state.sessions
             .filter {
                 $0.tool == .cursor
                     && $0.isTrackedLiveSession
-                    && $0.updatedAt >= Date.now.addingTimeInterval(-86_400)
+                    && $0.updatedAt >= now.addingTimeInterval(-86_400)
+                    && !$0.isExpiredCompletedSession(at: now)
                     && ($0.jumpTarget != nil || $0.cursorMetadata?.conversationId != nil)
             }
             .map(CursorTrackedSessionRecord.init(session:))

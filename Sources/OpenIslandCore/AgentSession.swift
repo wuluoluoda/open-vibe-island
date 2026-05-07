@@ -475,6 +475,8 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
 }
 
 public extension AgentSession {
+    static let completedVisibilityRetention: TimeInterval = 2 * 60 * 60
+
     var isDemoSession: Bool {
         origin == .demo
     }
@@ -495,8 +497,13 @@ public extension AgentSession {
     /// Hook-managed sessions (Claude Code via hooks) rely on hook lifecycle
     /// signals; non-hook sessions use process polling.
     var isVisibleInIsland: Bool {
+        isVisibleInIsland(at: .now)
+    }
+
+    func isVisibleInIsland(at referenceDate: Date) -> Bool {
         if isDemoSession { return true }
         if phase.requiresAttention { return true }
+        if isExpiredCompletedSession(at: referenceDate) { return false }
         // Codex.app sessions stay visible while the desktop app is running.
         // Checked before isHookManaged because a Codex.app session may also
         // be hook-managed (when both hook and rediscovery converge on it).
@@ -504,6 +511,11 @@ public extension AgentSession {
         if isHookManaged { return !isSessionEnded }
         if isProcessAlive { return true }
         return false
+    }
+
+    func isExpiredCompletedSession(at referenceDate: Date) -> Bool {
+        phase == .completed
+            && referenceDate.timeIntervalSince(updatedAt) >= Self.completedVisibilityRetention
     }
 
     var currentToolName: String? {
