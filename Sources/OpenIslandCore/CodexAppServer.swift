@@ -88,6 +88,8 @@ public final class CodexAppServerClient: @unchecked Sendable {
     private let codexPath: String
     private var process: Process?
     private var stdin: FileHandle?
+    private var stdout: FileHandle?
+    private var stderr: FileHandle?
     private var readBuffer = Data()
     private var pendingRequests: [Int: CheckedContinuation<Data, any Error>] = [:]
     private var nextRequestID = 1
@@ -97,6 +99,10 @@ public final class CodexAppServerClient: @unchecked Sendable {
 
     public init(codexPath: String = "/Applications/Codex.app/Contents/Resources/codex") {
         self.codexPath = codexPath
+    }
+
+    deinit {
+        stop()
     }
 
     public var isRunning: Bool {
@@ -120,42 +126,77 @@ public final class CodexAppServerClient: @unchecked Sendable {
         proc.standardOutput = stdoutPipe
         proc.standardError = stderrPipe
 
-        self.stdin = stdinPipe.fileHandleForWriting
+        let stdinHandle = stdinPipe.fileHandleForWriting
+        let stdoutHandle = stdoutPipe.fileHandleForReading
+        let stderrHandle = stderrPipe.fileHandleForReading
+
+        self.stdin = stdinHandle
+        self.stdout = stdoutHandle
+        self.stderr = stderrHandle
         self.process = proc
 
         // Read stdout in a background thread.
-        stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+        stdoutHandle.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            guard !data.isEmpty else { return }
+            guard !data.isEmpty else {
+                self?.handleProcessDisconnected()
+                return
+            }
             self?.handleIncomingData(data)
         }
 
         // Drain stderr so a full pipe can't block the child process.
-        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+        stderrHandle.readabilityHandler = { [weak self] handle in
             _ = handle.availableData
-        }
-
-        try proc.run()
-
-        // Send initialize request.
-        struct InitializeParams: Encodable {
-            struct ClientInfo: Encodable {
-                let name: String
-                let version: String
+            if self?.process?.isRunning == false {
+                self?.handleProcessDisconnected()
             }
-            let clientInfo: ClientInfo
         }
-        _ = try await sendRequest(
-            method: "initialize",
-            params: InitializeParams(clientInfo: .init(name: "OpenIsland", version: "1.0.0"))
-        )
+
+        proc.terminationHandler = { [weak self] _ in
+            self?.handleProcessDisconnected()
+        }
+
+        do {
+            try proc.run()
+
+            // Send initialize request.
+            struct InitializeParams: Encodable {
+                struct ClientInfo: Encodable {
+                    let name: String
+                    let version: String
+                }
+                let clientInfo: ClientInfo
+            }
+            _ = try await sendRequest(
+                method: "initialize",
+                params: InitializeParams(clientInfo: .init(name: "OpenIsland", version: "1.0.0"))
+            )
+        } catch {
+            stop()
+            throw error
+        }
     }
 
     /// Stop the app-server subprocess.
     public func stop() {
-        process?.terminate()
+        stdout?.readabilityHandler = nil
+        stderr?.readabilityHandler = nil
+        process?.terminationHandler = nil
+
+        try? stdin?.close()
+        try? stdout?.close()
+        try? stderr?.close()
+
+        if process?.isRunning == true {
+            process?.terminate()
+        }
         process = nil
         stdin = nil
+        stdout = nil
+        stderr = nil
+        readBuffer.removeAll(keepingCapacity: false)
+
         lock.lock()
         let pending = pendingRequests
         pendingRequests.removeAll()
@@ -163,6 +204,10 @@ public final class CodexAppServerClient: @unchecked Sendable {
         for (_, continuation) in pending {
             continuation.resume(throwing: CodexAppServerError.disconnected)
         }
+    }
+
+    private func handleProcessDisconnected() {
+        stop()
     }
 
     // MARK: - Requests
