@@ -7,7 +7,8 @@ Use this skill when working in this repository on branch/worktree management, lo
 - Start every round with `git status -sb`.
 - Read [AGENTS.md](../../../AGENTS.md) and [docs/tool-versioning.md](../../../docs/tool-versioning.md) for the current workflow.
 - Do not edit directly on `main`.
-- Use a topic worktree for code, app, or workflow changes.
+- Use a focused topic branch in the current checkout for code, app, or workflow changes.
+- Do not create a new git worktree unless the user explicitly asks for one.
 - Treat `codex/codex-island-suite` as the current local continuous-testing branch unless the user names another branch.
 - Treat `OpenIslandApp` as the canonical executable product.
 - Refresh `~/Applications/Open Island Dev.app` with `zsh scripts/launch-dev-app.sh`; do not rely on opening the bundle alone.
@@ -18,22 +19,22 @@ Use this skill when working in this repository on branch/worktree management, lo
 git status -sb
 git log --oneline --decorate -5
 git branch --show-current
-git worktree list
 ```
 
-## Topic Worktree Base Selection
+## Topic Branch Base Selection
 
 Use `origin/main` for work intended for normal integration:
 
 ```bash
 git fetch --all --prune
-git worktree add -b fix/<topic> ../open-vibe-island-<topic> origin/main
+git switch -c fix/<topic> origin/main
 ```
 
 Use `codex/codex-island-suite` for fixes to the version currently being tested locally:
 
 ```bash
-git worktree add -b fix/<topic> ../open-vibe-island-<topic> codex/codex-island-suite
+git switch codex/codex-island-suite
+git switch -c fix/<topic>
 ```
 
 State which base was used and why.
@@ -65,6 +66,7 @@ When the user says to apply, use, switch to, or merge a fix into the current app
 ```bash
 cd /Users/wuluoluo/Documents/open-vibe-island
 git status -sb
+git switch codex/codex-island-suite
 git merge --ff-only <topic-branch>
 zsh scripts/launch-dev-app.sh
 ```
@@ -93,4 +95,3 @@ Include:
 - running app evidence, if refreshed
 - tag name, if created
 - remaining gaps
-
