@@ -13,7 +13,7 @@ This repository should use Git worktrees as the default shape for development.
 
 ### 1. Integration worktree
 
-- Path: `/Users/wangruobing/Personal/open-island`
+- Path: `/Users/wuluoluo/Documents/open-vibe-island`
 - Branch: `main`
 - Purpose: fetch, mirror `main` after PR merges, and verify
 
@@ -25,7 +25,7 @@ Rules:
 
 ### 2. Topic worktrees
 
-- Path pattern: `/Users/wangruobing/Personal/open-island-<topic>`
+- Path pattern: `/Users/wuluoluo/Documents/open-vibe-island-<topic>`
 - Branch pattern: `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, `investigate/<topic>`
 - Purpose: isolated implementation for one slice
 
@@ -44,14 +44,20 @@ From the integration worktree:
 
 ```bash
 git fetch origin
-git worktree add /Users/wangruobing/Personal/open-island-<topic> -b <branch-name> origin/main
+git worktree add /Users/wuluoluo/Documents/open-vibe-island-<topic> -b <branch-name> origin/main
 ```
 
 Example:
 
 ```bash
 git fetch origin
-git worktree add /Users/wangruobing/Personal/open-island-island-polish -b feat/island-polish origin/main
+git worktree add /Users/wuluoluo/Documents/open-vibe-island-island-polish -b feat/island-polish origin/main
+```
+
+If the bug exists in the current local testing branch rather than `origin/main`, branch from that testing branch and state that choice:
+
+```bash
+git worktree add /Users/wuluoluo/Documents/open-vibe-island-row-jump -b fix/row-jump codex/codex-island-suite
 ```
 
 ## Work inside the topic worktree
@@ -100,7 +106,7 @@ git pull --ff-only origin main
 After the topic branch is merged:
 
 ```bash
-git worktree remove /Users/wangruobing/Personal/open-island-<topic>
+git worktree remove /Users/wuluoluo/Documents/open-vibe-island-<topic>
 git branch -d <branch-name>
 ```
 
@@ -113,7 +119,7 @@ git push origin --delete <branch-name>
 ## Recommended Conventions
 
 - Keep topic names short and concrete: `codex-hooks-noise`, `island-geometry`, `claude-usage`.
-- Prefer sibling directories under `/Users/wangruobing/Personal/` so all worktrees stay easy to discover.
+- Prefer sibling directories under `/Users/wuluoluo/Documents/` so all worktrees stay easy to discover.
 - Do not leave long-lived unmerged worktrees drifting far away from `origin/main`.
 - If a worktree becomes exploratory rather than shippable, rename the branch into `investigate/<topic>` or close it.
 - When assigning work to multiple agents, split by file ownership or subsystem, not by vague goal.

@@ -15,6 +15,7 @@ Keep all work incremental, reviewable, and reversible. Every meaningful round of
 5. After making changes, run the most relevant verification available for that round.
 6. Summarize what changed, including any verification gaps.
 7. Commit the round on the feature branch before stopping.
+8. When a change is intended for local app testing, integrate it into the current local testing branch and refresh the running dev app from that branch.
 
 ## Commit Policy
 
@@ -41,12 +42,14 @@ Keep all work incremental, reviewable, and reversible. Every meaningful round of
 
 ## Branching And Worktree Rules
 
-- Treat `/Users/wangruobing/Personal/open-island` on `main` as the shared integration worktree.
+- Treat `/Users/wuluoluo/Documents/open-vibe-island` as the current local testing worktree for the `codex/codex-island-suite` workstream unless the user names another branch.
+- Treat `main` as the shared integration branch.
 - Never edit, commit, or push directly on `main`. All changes must go through a feature branch and PR before integration.
 - Use the shared `main` worktree only to inspect repository state, fetch, update with `git pull --ff-only`, and run final verification after PRs merge.
 - Create one worktree per branch and one branch per worktree. Never attach two worktrees to the same branch.
 - Create new worktrees from `origin/main`, not from a locally drifted feature branch.
-- Use sibling worktree paths named like `/Users/wangruobing/Personal/open-island-<topic>`.
+- When fixing behavior in the currently running local dev app, create the topic worktree from `codex/codex-island-suite` and state that choice explicitly.
+- Use sibling worktree paths named like `/Users/wuluoluo/Documents/open-vibe-island-<topic>`.
 - Use branch names that match the workstream, such as `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, or `investigate/<topic>`.
 - Keep each worktree focused on one coherent slice with a narrow file ownership area when possible.
 - Rebase or merge the latest `origin/main` into the feature branch before integrating it back.
@@ -55,7 +58,8 @@ Keep all work incremental, reviewable, and reversible. Every meaningful round of
 - If multiple agents are working in parallel, assign each agent its own worktree instead of sharing one checkout.
 - All PRs must target `main`. Do not chain PRs through another feature branch unless the user explicitly requests that structure.
 
-See [docs/worktree-workflow.md](/Users/wangruobing/Personal/open-island/docs/worktree-workflow.md) for the concrete commands and lifecycle.
+See [docs/worktree-workflow.md](/Users/wuluoluo/Documents/open-vibe-island/docs/worktree-workflow.md) for the concrete commands and lifecycle.
+See [docs/tool-versioning.md](/Users/wuluoluo/Documents/open-vibe-island/docs/tool-versioning.md) for the local runtime, tag, and rollback workflow.
 
 ## Product Boundaries
 
@@ -87,6 +91,7 @@ See [docs/worktree-workflow.md](/Users/wangruobing/Personal/open-island/docs/wor
 
 - Run targeted checks that match the change.
 - If no automated verification exists yet, state that explicitly in the final summary and still commit the change.
+- For app-runtime changes, verify that `~/Applications/Open Island Dev.app` has been refreshed from the intended commit with `zsh scripts/launch-dev-app.sh`, then confirm the running process or binary timestamp.
 - After a verified integration checkpoint that may be used for builds, create an annotated Git tag on the exact commit using a non-release prefix such as `build/<topic>-YYYYMMDD-<shortsha>`.
 - If the checkpoint is intended to be a precise product version or release version, ask the user before creating a version tag such as `v1.0.30`.
 - In final summaries, include the tag name when a tag is created, and distinguish build checkpoint tags from release/version tags.
