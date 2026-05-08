@@ -607,7 +607,8 @@ final class AppModel {
         isNotificationSessionAlreadyFrontmost: @escaping @Sendable (AgentSession) async -> Bool = { session in
             await ForegroundTerminalSessionProbe().matches(session: session)
         },
-        codexShelfFileActions: CodexShelfFileActioning = WorkspaceCodexShelfFileActions()
+        codexShelfFileActions: CodexShelfFileActioning = WorkspaceCodexShelfFileActions(),
+        codexShelfEnabledOverride: Bool? = nil
     ) {
         self.terminalJumpAction = terminalJumpAction
         self.isNotificationSessionAlreadyFrontmost = isNotificationSessionAlreadyFrontmost
@@ -620,7 +621,7 @@ final class AppModel {
             Self.codexStalledThresholdMinutesDefaultsKey: 12,
             Self.codexLoopSuspectedEnabledDefaultsKey: false,
             Self.codexLoopSuspectedThresholdDefaultsKey: 4,
-            Self.codexShelfEnabledDefaultsKey: true,
+            Self.codexShelfEnabledDefaultsKey: false,
             Self.codexRadarEnabledDefaultsKey: true,
         ])
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
@@ -645,7 +646,8 @@ final class AppModel {
             3,
             UserDefaults.standard.integer(forKey: Self.codexLoopSuspectedThresholdDefaultsKey)
         )
-        codexShelfEnabled = UserDefaults.standard.bool(forKey: Self.codexShelfEnabledDefaultsKey)
+        codexShelfEnabled = codexShelfEnabledOverride
+            ?? UserDefaults.standard.bool(forKey: Self.codexShelfEnabledDefaultsKey)
         codexRadarEnabled = UserDefaults.standard.bool(forKey: Self.codexRadarEnabledDefaultsKey)
         launchAtLoginEnabled = LaunchAtLoginService.shared.isEnabled
         islandAppearanceMode = IslandAppearanceMode(

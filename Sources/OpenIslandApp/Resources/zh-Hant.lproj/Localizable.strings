@@ -45,11 +45,11 @@
 "settings.general.languageTraditionalChinese" = "繁體中文";
 "settings.general.codexIsland" = "Codex 島設定";
 "settings.general.codexRadarView" = "啟用專案雷達面板";
-"settings.general.codexShelf" = "啟用產物 Shelf";
+"settings.general.codexShelf" = "啟用產物 Shelf（Beta）";
 "settings.general.codexLoopSuspected" = "啟用循環疑似提示";
 "settings.general.codexStalledThreshold" = "卡住判定門檻";
 "settings.general.codexLoopThreshold" = "循環重複門檻";
-"settings.general.codexIslandHint" = "Stalled 與 Loop 僅為保守提示。若干擾較大，可在此關閉實驗訊號。";
+"settings.general.codexIslandHint" = "產物 Shelf 仍是 Beta 功能。Stalled 與 Loop 僅為保守提示。若干擾較大，可在此關閉實驗訊號。";
 "settings.general.minutes" = "%lld 分鐘";
 "settings.general.attempts" = "%lld 次";
 

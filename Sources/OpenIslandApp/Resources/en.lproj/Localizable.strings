@@ -45,11 +45,11 @@
 "settings.general.languageTraditionalChinese" = "Chinese (Traditional)";
 "settings.general.codexIsland" = "Codex Island";
 "settings.general.codexRadarView" = "Enable project radar panel";
-"settings.general.codexShelf" = "Enable artifact shelf";
+"settings.general.codexShelf" = "Enable artifact shelf (Beta)";
 "settings.general.codexLoopSuspected" = "Enable loop suspected hints";
 "settings.general.codexStalledThreshold" = "Stalled threshold";
 "settings.general.codexLoopThreshold" = "Loop repeat threshold";
-"settings.general.codexIslandHint" = "Stalled and loop signals are conservative hints only. Disable experimental signals here if they feel noisy.";
+"settings.general.codexIslandHint" = "Artifact Shelf is a Beta feature. Stalled and loop signals are conservative hints only. Disable experimental signals here if they feel noisy.";
 "settings.general.minutes" = "%lld min";
 "settings.general.attempts" = "%lld attempts";
 

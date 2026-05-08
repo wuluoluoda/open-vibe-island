@@ -888,7 +888,7 @@ struct AppModelSessionListTests {
     @Test
     func codexShelfIgnoresReferencedPathsThatWereNotChangedByCodex() throws {
         let now = Date(timeIntervalSince1970: 3_900)
-        let model = AppModel()
+        let model = AppModel(codexShelfEnabledOverride: true)
         let fileManager = FileManager.default
 
         let workspaceURL = fileManager.temporaryDirectory
@@ -937,7 +937,7 @@ struct AppModelSessionListTests {
     @Test
     func codexShelfTracksFilesModifiedAfterSessionBaseline() throws {
         let now = Date(timeIntervalSince1970: 3_920)
-        let model = AppModel()
+        let model = AppModel(codexShelfEnabledOverride: true)
         let fileManager = FileManager.default
 
         let workspaceURL = fileManager.temporaryDirectory
@@ -1001,7 +1001,7 @@ struct AppModelSessionListTests {
     @Test
     func codexShelfThrottlesActivityWorkspaceScans() throws {
         let now = Date(timeIntervalSince1970: 3_925)
-        let model = AppModel()
+        let model = AppModel(codexShelfEnabledOverride: true)
         let fileManager = FileManager.default
 
         let workspaceURL = fileManager.temporaryDirectory
@@ -1073,7 +1073,7 @@ struct AppModelSessionListTests {
     @Test
     func codexShelfCompletionBypassesActivityScanThrottle() throws {
         let now = Date(timeIntervalSince1970: 3_926)
-        let model = AppModel()
+        let model = AppModel(codexShelfEnabledOverride: true)
         let fileManager = FileManager.default
 
         let workspaceURL = fileManager.temporaryDirectory
@@ -1131,7 +1131,7 @@ struct AppModelSessionListTests {
     @Test
     func codexShelfHidesDebugLogsByDefault() throws {
         let now = Date(timeIntervalSince1970: 3_930)
-        let model = AppModel()
+        let model = AppModel(codexShelfEnabledOverride: true)
         let fileManager = FileManager.default
 
         let workspaceURL = fileManager.temporaryDirectory
@@ -1182,7 +1182,7 @@ struct AppModelSessionListTests {
     @Test
     func codexShelfIgnoresNonCodexSessions() throws {
         let now = Date(timeIntervalSince1970: 3_950)
-        let model = AppModel()
+        let model = AppModel(codexShelfEnabledOverride: true)
         let fileManager = FileManager.default
 
         let workspaceURL = fileManager.temporaryDirectory
@@ -1228,9 +1228,67 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func codexShelfDoesNotScanWhenBetaDisabled() throws {
+        let now = Date(timeIntervalSince1970: 3_960)
+        let model = AppModel(codexShelfEnabledOverride: false)
+        let fileManager = FileManager.default
+
+        let workspaceURL = fileManager.temporaryDirectory
+            .appendingPathComponent("open-island-shelf-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: workspaceURL, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: workspaceURL) }
+
+        let fileURL = workspaceURL.appendingPathComponent("main.swift")
+        try "print(\"hello\")".write(to: fileURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes(
+            [.modificationDate: now.addingTimeInterval(-60)],
+            ofItemAtPath: fileURL.path
+        )
+
+        model.applyTrackedEvent(
+            .sessionStarted(
+                SessionStarted(
+                    sessionID: "codex-shelf-beta-off",
+                    title: "Codex · shelf-project",
+                    tool: .codex,
+                    origin: .live,
+                    summary: "Working on docs",
+                    timestamp: now,
+                    jumpTarget: JumpTarget(
+                        terminalApp: "Ghostty",
+                        workspaceName: "shelf-project",
+                        paneTitle: "codex ~/shelf-project",
+                        workingDirectory: workspaceURL.path
+                    )
+                )
+            )
+        )
+
+        try "print(\"updated\")".write(to: fileURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes(
+            [.modificationDate: now.addingTimeInterval(10)],
+            ofItemAtPath: fileURL.path
+        )
+
+        model.applyTrackedEvent(
+            .activityUpdated(
+                SessionActivityUpdated(
+                    sessionID: "codex-shelf-beta-off",
+                    summary: "Finished updating code.",
+                    phase: .running,
+                    timestamp: now.addingTimeInterval(11)
+                )
+            )
+        )
+
+        #expect(model.codexShelfItems.isEmpty)
+        #expect(model.codexShelfProjects.isEmpty)
+    }
+
+    @Test
     func codexShelfCanBeDisabledViaFeatureToggle() throws {
         let now = Date(timeIntervalSince1970: 3_975)
-        let model = AppModel()
+        let model = AppModel(codexShelfEnabledOverride: true)
         let fileManager = FileManager.default
 
         let workspaceURL = fileManager.temporaryDirectory
