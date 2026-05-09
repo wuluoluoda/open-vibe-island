@@ -20,6 +20,15 @@ enum TrackedEventIngress {
     case rollout
 }
 
+enum SessionPersistenceScope: Hashable, Sendable {
+    case codex
+    case claude
+    case openCode
+    case cursor
+
+    static let all: Set<SessionPersistenceScope> = [.codex, .claude, .openCode, .cursor]
+}
+
 enum EnergyProfile: Int, CaseIterable, Identifiable, Sendable {
     case quiet = 1
     case balanced = 2

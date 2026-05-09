@@ -1577,6 +1577,7 @@ final class AppModel {
         ingress: TrackedEventIngress = .bridge
     ) {
         let eventSessionID = sessionID(for: event)
+        let stateBeforeEvent = state
 
         // Snapshot whether this session was already completed before applying
         // the event. Used to suppress duplicate/stale completion notifications
@@ -1610,10 +1611,14 @@ final class AppModel {
         synchronizeSelection()
         discovery.refreshCodexRolloutTracking()
         refreshOverlayPlacementIfVisible()
-        discovery.scheduleCodexSessionPersistence()
-        discovery.scheduleClaudeSessionPersistence()
-        discovery.scheduleOpenCodeSessionPersistence()
-        discovery.scheduleCursorSessionPersistence()
+        if state != stateBeforeEvent {
+            scheduleSessionPersistence(
+                Self.persistenceScopes(
+                    for: event,
+                    session: eventSessionID.flatMap { state.session(id: $0) }
+                )
+            )
+        }
 
         // Push relevant events to the Watch/iPhone via the relay
         if let relay = watchRelay {
@@ -1631,6 +1636,65 @@ final class AppModel {
                 wasAlreadyCompleted: wasAlreadyCompleted,
                 ingress: ingress
             )
+        }
+    }
+
+    nonisolated static func persistenceScopes(
+        for event: AgentEvent,
+        session: AgentSession?
+    ) -> Set<SessionPersistenceScope> {
+        switch event {
+        case let .sessionStarted(payload):
+            return persistenceScopes(for: payload.tool)
+        case .sessionMetadataUpdated:
+            return [.codex]
+        case .claudeSessionMetadataUpdated:
+            return [.claude]
+        case .openCodeSessionMetadataUpdated:
+            return [.openCode]
+        case .cursorSessionMetadataUpdated:
+            return [.cursor]
+        case .geminiSessionMetadataUpdated:
+            return []
+        default:
+            guard let session else {
+                return SessionPersistenceScope.all
+            }
+            return persistenceScopes(for: session.tool)
+        }
+    }
+
+    nonisolated private static func persistenceScopes(for tool: AgentTool) -> Set<SessionPersistenceScope> {
+        switch tool {
+        case .codex:
+            return [.codex]
+        case .claudeCode:
+            return [.claude]
+        case .openCode:
+            return [.openCode]
+        case .cursor:
+            return [.cursor]
+        case .geminiCLI, .qoder, .qwenCode, .factory, .codebuddy, .kimiCLI:
+            return []
+        }
+    }
+
+    private func scheduleSessionPersistence(_ scopes: Set<SessionPersistenceScope>) {
+        guard !scopes.isEmpty else {
+            return
+        }
+
+        if scopes.contains(.codex) {
+            discovery.scheduleCodexSessionPersistence()
+        }
+        if scopes.contains(.claude) {
+            discovery.scheduleClaudeSessionPersistence()
+        }
+        if scopes.contains(.openCode) {
+            discovery.scheduleOpenCodeSessionPersistence()
+        }
+        if scopes.contains(.cursor) {
+            discovery.scheduleCursorSessionPersistence()
         }
     }
 

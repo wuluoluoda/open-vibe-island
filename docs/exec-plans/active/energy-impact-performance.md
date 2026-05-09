@@ -28,6 +28,7 @@
 - Clicks use a fresh cached target immediately, otherwise fall back to the latest known target and schedule a repair prewarm.
 - Added a localized Settings-only global energy profile with compact `1 2 3` controls.
 - Mapped the global profile to monitor cadence and warm jump-target cache TTL defaults.
+- Scoped event-driven session persistence to the changed tool family and skipped persistence when an event produces no state change.
 
 ## Completed Slice: On-Demand Usage Refresh
 
@@ -117,7 +118,7 @@ Keep rollout file watching available for reliability, but avoid duplicating real
 - Resume rollout polling as a fallback when the real-time channel disconnects, misses expected state, or has not delivered recent updates.
 - Avoid duplicate completion or activity events when both channels report the same session.
 
-## Later Slice: Tool-Scoped Persistence
+## Completed Slice: Tool-Scoped Persistence
 
 Avoid scheduling every persistence store after every event:
 
