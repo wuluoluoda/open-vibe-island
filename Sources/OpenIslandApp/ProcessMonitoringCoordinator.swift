@@ -8,6 +8,9 @@ typealias ActiveProcessSnapshot = ActiveAgentProcessDiscovery.ProcessSnapshot
 @MainActor
 @Observable
 final class ProcessMonitoringCoordinator {
+    private typealias GhosttyAvailability = TerminalSessionAttachmentProbe.SnapshotAvailability<TerminalSessionAttachmentProbe.GhosttyTerminalSnapshot>
+    private typealias TerminalAvailability = TerminalSessionAttachmentProbe.SnapshotAvailability<TerminalSessionAttachmentProbe.TerminalTabSnapshot>
+
     var isResolvingInitialLiveSessions = false
 
     @ObservationIgnored
@@ -68,10 +71,23 @@ final class ProcessMonitoringCoordinator {
                 let probe = self.terminalSessionAttachmentProbe
                 let resolver = self.terminalJumpTargetResolver
                 let liveSessions = self.state.sessions.filter(\.isTrackedLiveSession)
-                let (snapshots, ghosttyAvail, terminalAvail, jumpTargets) = await Task.detached(priority: .utility) {
+                let (snapshots, ghosttyAvail, terminalAvail, jumpTargets): (
+                    [ActiveProcessSnapshot],
+                    GhosttyAvailability?,
+                    TerminalAvailability?,
+                    [String: JumpTarget]
+                ) = await Task.detached(priority: .utility) {
                     let s = discovery.discover()
-                    let g = probe.ghosttySnapshotAvailability()
-                    let t = probe.terminalSnapshotAvailability()
+
+                    guard Self.shouldCollectTerminalSnapshots(
+                        existingLiveSessions: liveSessions,
+                        activeProcesses: s
+                    ) else {
+                        return (s, nil, nil, [:])
+                    }
+
+                    let g: GhosttyAvailability? = probe.ghosttySnapshotAvailability()
+                    let t: TerminalAvailability? = probe.terminalSnapshotAvailability()
                     let j = resolver.resolveJumpTargets(for: liveSessions, activeProcesses: s)
                     return (s, g, t, j)
                 }.value
@@ -81,9 +97,40 @@ final class ProcessMonitoringCoordinator {
                     terminalAvailability: terminalAvail,
                     preResolvedJumpTargets: jumpTargets
                 )
-                try? await Task.sleep(for: .seconds(2))
+
+                let nextLiveSessions = self.state.sessions.filter(\.isTrackedLiveSession)
+                let sleepDuration = Self.monitorSleepDuration(
+                    for: nextLiveSessions,
+                    isResolvingInitialLiveSessions: self.isResolvingInitialLiveSessions
+                )
+                try? await Task.sleep(for: sleepDuration)
             }
         }
+    }
+
+    nonisolated static func monitorSleepDuration(
+        for liveSessions: [AgentSession],
+        isResolvingInitialLiveSessions: Bool
+    ) -> Duration {
+        if isResolvingInitialLiveSessions {
+            return .seconds(2)
+        }
+
+        guard !liveSessions.isEmpty else {
+            return .seconds(8)
+        }
+
+        let hasActiveWork = liveSessions.contains {
+            $0.phase == .running || $0.phase.requiresAttention
+        }
+        return hasActiveWork ? .seconds(2) : .seconds(5)
+    }
+
+    nonisolated private static func shouldCollectTerminalSnapshots(
+        existingLiveSessions: [AgentSession],
+        activeProcesses: [ActiveProcessSnapshot]
+    ) -> Bool {
+        !existingLiveSessions.isEmpty || !activeProcesses.isEmpty
     }
 
     // MARK: - Reconciliation
