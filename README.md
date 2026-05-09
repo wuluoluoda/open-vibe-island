@@ -13,15 +13,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/wuluoluoda/open-vibe-island/releases/latest"><img src="https://img.shields.io/github/v/release/wuluoluoda/open-vibe-island?style=flat-square&label=fork%20build&color=blue" alt="Latest fork build"></a>
-  <a href="https://github.com/Octane0411/open-vibe-island"><img src="https://img.shields.io/badge/upstream-Octane0411%2Fopen--vibe--island-lightgrey?style=flat-square" alt="Upstream repository"></a>
+  <a href="https://github.com/wuluoluoda/open-island/releases/latest"><img src="https://img.shields.io/github/v/release/wuluoluoda/open-island?style=flat-square&label=release&color=blue" alt="Latest release"></a>
   <a href="https://discord.gg/bPF2HpbCFb"><img src="https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3-green?style=flat-square" alt="License: GPL v3"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/wuluoluoda/open-vibe-island/releases">Fork Builds</a> ·
-  <a href="https://github.com/Octane0411/open-vibe-island">Upstream</a> ·
+  <a href="https://github.com/wuluoluoda/open-island/releases">Releases</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="docs/roadmap.md">Roadmap</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
@@ -33,19 +31,19 @@
 
 ---
 
-## Fork Notice
+## Project Lineage
 
-This repository is a personal fork of [Octane0411/open-vibe-island](https://github.com/Octane0411/open-vibe-island). It keeps the GPLv3 upstream foundation and focuses on a Codex-heavy workflow that I use locally.
+Open Island is based on [Octane0411/open-vibe-island](https://github.com/Octane0411/open-vibe-island) and is distributed under the GNU General Public License v3.0. This repository is maintained as an independent GPLv3 project by [wuluoluoda](https://github.com/wuluoluoda), with emphasis on a Codex-heavy local workflow.
 
-### What This Fork Adds
+### What This Project Adds
 
 - **Codex Desktop App radar** — a denser operational panel for live thread/turn state, reconnecting sessions, interrupted work, and loop hints.
 - **Codex artifact shelf** — a dedicated shelf for Codex-produced files and paths, with quick file actions from the island UI.
 - **More stable Codex session tracking** — row ordering, transient reconnects, stale interrupted states, completed-session expiry, and session labels have been tightened.
 - **Overlay behavior fixes** — hover recovery, directional shelf expansion, and panel height handling are tuned for long Codex sessions.
-- **Reviewable local workflow** — build checkpoint tags, tool-versioning notes, and broader tests document how this fork is packaged and rolled back.
+- **Reviewable local workflow** — build checkpoint tags, project workflow notes, and broader tests document how this project is packaged and rolled back.
 
-Download this fork's current DMG from [GitHub Releases](https://github.com/wuluoluoda/open-vibe-island/releases). The local build is currently unsigned, so macOS Gatekeeper may require right-clicking **Open** or removing quarantine after download.
+Download the current DMG from [GitHub Releases](https://github.com/wuluoluoda/open-island/releases). Local builds may be unsigned, so macOS Gatekeeper can require right-clicking **Open** or removing quarantine after download.
 
 ## What is Open Island?
 
@@ -57,7 +55,7 @@ Think of it as an open-source [Vibe Island](https://vibeisland.app/) — **free,
 
 ## Why Open Island?
 
-- **Open source** — GPL v3, fork it, mod it, ship your own version
+- **Open source** — GPL v3, modify it, audit it, ship your own version under the same license
 - **Local-first** — No server, no telemetry, no account. Everything runs on your Mac
 - **Native macOS** — SwiftUI + AppKit, not an Electron wrapper
 - **Multi-agent** — One surface for Claude Code, Codex, Cursor, Gemini CLI, OpenCode, and more
@@ -126,27 +124,15 @@ Think of it as an open-source [Vibe Island](https://vibeisland.app/) — **free,
 
 ### Option 1: Download
 
-For this fork, download the current DMG from [wuluoluoda/open-vibe-island releases](https://github.com/wuluoluoda/open-vibe-island/releases). This build is unsigned and intended for local testing.
+Download the current DMG from [wuluoluoda/open-island releases](https://github.com/wuluoluoda/open-island/releases). Builds may be unsigned unless a release explicitly states otherwise.
 
-For the upstream signed and notarized app, use [Octane0411/open-vibe-island releases](https://github.com/Octane0411/open-vibe-island/releases).
-
-### Option 2: Homebrew
+### Option 2: Build from source
 
 ```bash
-brew install --cask octane0411/tap/openisland
-```
-
-Upgrade later with `brew upgrade --cask openisland`.
-
-### Option 3: Build from source
-
-```bash
-git clone https://github.com/wuluoluoda/open-vibe-island.git
-cd open-vibe-island
+git clone https://github.com/wuluoluoda/open-island.git
+cd open-island
 open Package.swift   # Opens in Xcode — hit Run
 ```
-
-To build the original upstream project instead, clone [Octane0411/open-vibe-island](https://github.com/Octane0411/open-vibe-island).
 
 On first launch, Open Island auto-discovers your active agent sessions and starts the live bridge. Hook installation is managed from the **Settings** window inside the app.
 
@@ -207,7 +193,7 @@ Copy this prompt into your agent (Claude Code, Codex, etc.) to auto-generate a w
 <summary>Click to expand</summary>
 
 ```
-I'm having an issue with Open Island (https://github.com/Octane0411/open-vibe-island).
+I'm having an issue with Open Island (https://github.com/wuluoluoda/open-island).
 
 Please help me file a GitHub issue. Do the following:
 
@@ -228,26 +214,26 @@ Please help me file a GitHub issue. Do the following:
    - Body with sections: **Environment**, **Description**, **Steps to Reproduce**, **Expected vs Actual Behavior**
    - Add label "bug" if applicable
 
-Repository: Octane0411/open-vibe-island
+Repository: wuluoluoda/open-island
 ```
 
 </details>
 
 ## Star History
 
-<a href="https://star-history.com/#Octane0411/open-vibe-island&Date">
+<a href="https://star-history.com/#wuluoluoda/open-island&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=wuluoluoda/open-island&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=wuluoluoda/open-island&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=wuluoluoda/open-island&type=Date" />
  </picture>
 </a>
 
 ## Contributors
 
-<a href="https://github.com/Octane0411/open-vibe-island/graphs/contributors">
+<a href="https://github.com/wuluoluoda/open-island/graphs/contributors">
   <!-- CONTRIBUTORS-IMG:START -->
-  <img src="https://contrib.rocks/image?repo=Octane0411/open-vibe-island&t=1777712167" />
+  <img src="https://contrib.rocks/image?repo=wuluoluoda/open-island" />
   <!-- CONTRIBUTORS-IMG:END -->
 </a>
 
