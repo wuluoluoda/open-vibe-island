@@ -30,6 +30,7 @@
 - Mapped the global profile to monitor cadence and warm jump-target cache TTL defaults.
 - Scoped event-driven session persistence to the changed tool family and skipped persistence when an event produces no state change.
 - Gated Codex rollout watcher targets while a same-session real-time Codex channel is recently healthy, with fallback resuming after the health window expires.
+- Moved precise terminal attachment snapshot reconciliation to a lower cadence while retaining startup checks and process/event-driven liveness between probes.
 
 ## Completed Slice: On-Demand Usage Refresh
 
@@ -61,7 +62,7 @@ Avoid moving all jump-target resolution to the exact click moment, because waiti
 
 This does not conflict with weakening `attached` / `stale` / `detached` monitoring. Those states describe terminal connection precision for display and cleanup; they are not the island's core running / approval / question / completed state. Terminal probing should primarily serve the jump-back interaction, using pre-warm and short-lived cache behavior, rather than continuously proving that every session is still attached.
 
-## Later Slice: Lower-Priority Attachment State Reconciliation
+## Completed Slice: Lower-Priority Attachment State Reconciliation
 
 `attached`, `stale`, and `detached` should remain useful when the app needs cleanup or diagnostics, but they should not drive high-frequency terminal checks:
 

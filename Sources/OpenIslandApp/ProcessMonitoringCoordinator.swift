@@ -52,6 +52,9 @@ final class ProcessMonitoringCoordinator {
     @ObservationIgnored
     private var wasCodexAppRunning = false
 
+    @ObservationIgnored
+    private var lastTerminalSnapshotProbeDate: Date?
+
     private struct CachedJumpTargetEntry: Equatable {
         var target: JumpTarget
         var resolvedAt: Date
@@ -84,24 +87,36 @@ final class ProcessMonitoringCoordinator {
                 let discovery = self.activeAgentProcessDiscovery
                 let probe = self.terminalSessionAttachmentProbe
                 let liveSessions = self.state.sessions.filter(\.isTrackedLiveSession)
-                let (snapshots, ghosttyAvail, terminalAvail): (
+                let lastTerminalSnapshotProbeDate = self.lastTerminalSnapshotProbeDate
+                let isResolvingInitialLiveSessions = self.isResolvingInitialLiveSessions
+                let energyProfile = self.energyProfile
+                let (snapshots, ghosttyAvail, terminalAvail, didCollectTerminalSnapshots): (
                     [ActiveProcessSnapshot],
                     GhosttyAvailability?,
-                    TerminalAvailability?
+                    TerminalAvailability?,
+                    Bool
                 ) = await Task.detached(priority: .utility) {
                     let s = discovery.discover()
+                    let now = Date()
 
                     guard Self.shouldCollectTerminalSnapshots(
                         existingLiveSessions: liveSessions,
-                        activeProcesses: s
+                        activeProcesses: s,
+                        isResolvingInitialLiveSessions: isResolvingInitialLiveSessions,
+                        lastTerminalSnapshotProbeDate: lastTerminalSnapshotProbeDate,
+                        now: now,
+                        energyProfile: energyProfile
                     ) else {
-                        return (s, nil, nil)
+                        return (s, nil, nil, false)
                     }
 
                     let g: GhosttyAvailability? = probe.ghosttySnapshotAvailability()
                     let t: TerminalAvailability? = probe.terminalSnapshotAvailability()
-                    return (s, g, t)
+                    return (s, g, t, true)
                 }.value
+                if didCollectTerminalSnapshots {
+                    self.lastTerminalSnapshotProbeDate = Date()
+                }
                 self.reconcileSessionAttachments(
                     activeProcesses: snapshots,
                     ghosttyAvailability: ghosttyAvail,
@@ -138,11 +153,39 @@ final class ProcessMonitoringCoordinator {
         return hasActiveWork ? energyProfile.activeMonitorCadence : energyProfile.quietMonitorCadence
     }
 
-    nonisolated private static func shouldCollectTerminalSnapshots(
+    nonisolated static func shouldCollectTerminalSnapshots(
         existingLiveSessions: [AgentSession],
-        activeProcesses: [ActiveProcessSnapshot]
+        activeProcesses: [ActiveProcessSnapshot],
+        isResolvingInitialLiveSessions: Bool,
+        lastTerminalSnapshotProbeDate: Date?,
+        now: Date,
+        energyProfile: EnergyProfile = .balanced
     ) -> Bool {
-        !existingLiveSessions.isEmpty || !activeProcesses.isEmpty
+        guard !existingLiveSessions.isEmpty || !activeProcesses.isEmpty else {
+            return false
+        }
+
+        if isResolvingInitialLiveSessions {
+            return true
+        }
+
+        guard let lastTerminalSnapshotProbeDate else {
+            return true
+        }
+
+        return now.timeIntervalSince(lastTerminalSnapshotProbeDate) >= terminalSnapshotReconciliationInterval(
+            energyProfile: energyProfile
+        )
+    }
+
+    nonisolated static func terminalSnapshotReconciliationInterval(
+        energyProfile: EnergyProfile = .balanced
+    ) -> TimeInterval {
+        switch energyProfile {
+        case .quiet: 120
+        case .balanced: 60
+        case .responsive: 30
+        }
     }
 
     // MARK: - Reconciliation
@@ -196,22 +239,14 @@ final class ProcessMonitoringCoordinator {
             return
         }
 
-        let resolutionReport: TerminalSessionAttachmentProbe.ResolutionReport
-        if let ghosttyAvailability, let terminalAvailability {
-            resolutionReport = terminalSessionAttachmentProbe.sessionResolutionReport(
-                for: sessions,
-                ghosttyAvailability: ghosttyAvailability,
-                terminalAvailability: terminalAvailability,
-                activeProcesses: activeProcesses,
-                allowRecentAttachmentGrace: !isResolvingInitialLiveSessions
-            )
-        } else {
-            resolutionReport = terminalSessionAttachmentProbe.sessionResolutionReport(
-                for: sessions,
-                activeProcesses: activeProcesses,
-                allowRecentAttachmentGrace: !isResolvingInitialLiveSessions
-            )
-        }
+        let resolutionReport = terminalSessionAttachmentProbe.sessionResolutionReport(
+            for: sessions,
+            ghosttyAvailability: ghosttyAvailability ?? .unavailable(appIsRunning: false),
+            terminalAvailability: terminalAvailability ?? .unavailable(appIsRunning: false),
+            itermAvailability: .unavailable(appIsRunning: false),
+            activeProcesses: activeProcesses,
+            allowRecentAttachmentGrace: !isResolvingInitialLiveSessions
+        )
         let resolutions = resolutionReport.resolutions
         let attachmentUpdates = resolutions.mapValues { $0.attachmentState }
         let jumpTargetUpdates = resolutions.reduce(into: [String: JumpTarget]()) { partialResult, entry in

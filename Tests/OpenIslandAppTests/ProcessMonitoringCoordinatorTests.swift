@@ -76,6 +76,57 @@ struct ProcessMonitoringCoordinatorTests {
     }
 
     @Test
+    func terminalSnapshotCollectionUsesLowerCadenceAfterStartup() {
+        let now = Date(timeIntervalSince1970: 5_000)
+
+        #expect(!ProcessMonitoringCoordinator.shouldCollectTerminalSnapshots(
+            existingLiveSessions: [],
+            activeProcesses: [],
+            isResolvingInitialLiveSessions: false,
+            lastTerminalSnapshotProbeDate: nil,
+            now: now
+        ))
+
+        #expect(ProcessMonitoringCoordinator.shouldCollectTerminalSnapshots(
+            existingLiveSessions: [runningSession()],
+            activeProcesses: [],
+            isResolvingInitialLiveSessions: true,
+            lastTerminalSnapshotProbeDate: now,
+            now: now
+        ))
+
+        #expect(ProcessMonitoringCoordinator.shouldCollectTerminalSnapshots(
+            existingLiveSessions: [runningSession()],
+            activeProcesses: [],
+            isResolvingInitialLiveSessions: false,
+            lastTerminalSnapshotProbeDate: nil,
+            now: now
+        ))
+
+        #expect(!ProcessMonitoringCoordinator.shouldCollectTerminalSnapshots(
+            existingLiveSessions: [runningSession()],
+            activeProcesses: [],
+            isResolvingInitialLiveSessions: false,
+            lastTerminalSnapshotProbeDate: now.addingTimeInterval(-59),
+            now: now,
+            energyProfile: .balanced
+        ))
+
+        #expect(ProcessMonitoringCoordinator.shouldCollectTerminalSnapshots(
+            existingLiveSessions: [runningSession()],
+            activeProcesses: [],
+            isResolvingInitialLiveSessions: false,
+            lastTerminalSnapshotProbeDate: now.addingTimeInterval(-60),
+            now: now,
+            energyProfile: .balanced
+        ))
+
+        #expect(ProcessMonitoringCoordinator.terminalSnapshotReconciliationInterval(
+            energyProfile: .quiet
+        ) == 120)
+    }
+
+    @Test
     func cachedJumpTargetFreshnessHonorsTTL() {
         let resolvedAt = Date(timeIntervalSince1970: 1_000)
 
