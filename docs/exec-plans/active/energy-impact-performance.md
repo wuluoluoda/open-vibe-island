@@ -64,19 +64,37 @@ This does not conflict with weakening `attached` / `stale` / `detached` monitori
 
 Support coarse energy profiles first, then allow advanced users to override large modules individually. The app is a small island, so it is reasonable to expose a few clear controls instead of forcing one global behavior.
 
-Suggested global profiles:
+Place the controls in Settings, not in the island surface itself. The island UI should stay focused on session display, notifications, and jump-back. All new user-facing labels and descriptions must use the existing localization path so they follow the app's language setting.
 
-- `Responsive`: shortest refresh windows, best jump precision, higher background work.
-- `Balanced`: default profile; event-driven first, moderate pre-warm, reduced idle work.
-- `Quiet`: minimum background probes; refresh and precise checks happen mostly on demand.
+Suggested global profiles, represented as levels `1`, `2`, and `3` in compact UI:
+
+- `1 Quiet`: minimum background probes; refresh and precise checks happen mostly on demand.
+- `2 Balanced`: default profile; event-driven first, moderate pre-warm, reduced idle work.
+- `3 Responsive`: shortest refresh windows, best jump precision, higher background work.
 
 Candidate module-level overrides:
 
-- Jump target precision: `eager`, `prewarm`, or `on demand`.
-- Terminal attachment reconciliation: `normal`, `low frequency`, or `cleanup only`.
-- Usage refresh: `on demand`, `low frequency`, or `off`.
-- Codex rollout fallback: `always watch`, `fallback gated`, or `off when app-server is healthy`.
-- Overlay hover monitoring: `responsive`, `balanced`, or `click only`.
+- Jump target precision: `1 on demand`, `2 prewarm`, or `3 eager`.
+- Terminal attachment reconciliation: `1 cleanup only`, `2 low frequency`, or `3 normal`.
+- Usage refresh: `1 on demand`, `2 low frequency`, or `3 more current`.
+- Codex rollout fallback: `1 off when app-server is healthy`, `2 fallback gated`, or `3 always watch`.
+- Overlay hover monitoring: `1 click only`, `2 balanced`, or `3 responsive`.
+
+Compact Settings UI shape:
+
+- One global energy mode row.
+- One optional row per large-cost module.
+- Each row uses a compact `1 2 3` segmented control plus a short localized description of the currently selected level.
+- Descriptions should say what the selected level does, not explain the whole system.
+
+Example copy shape:
+
+- `Mode 1 2 3`: `Balanced defaults`
+- `Jump 1 2 3`: `Prewarm near interaction`
+- `Usage 1 2 3`: `Refresh on open`
+- `Attach 1 2 3`: `Cleanup checks only`
+- `Codex Log 1 2 3`: `Fallback when live channel is stale`
+- `Hover 1 2 3`: `Throttled hover tracking`
 
 Keep the first implementation conservative: one global profile can map to internal module defaults, and explicit module overrides can be added only where users need the control.
 
