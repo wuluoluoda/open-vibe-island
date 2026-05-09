@@ -41,6 +41,7 @@ final class AppModel {
     ]
     private static let syntheticClaudeSessionPrefix = "claude-process:"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
+    private static let codexRealtimeHealthWindow: TimeInterval = 30
     private static let jumpOverlayDismissLeadTime: Duration = .milliseconds(20)
     static let hoverOpenDelay: TimeInterval = 0.15
 
@@ -616,6 +617,12 @@ final class AppModel {
 
     @ObservationIgnored
     private var notificationPresentationTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var codexRolloutFallbackRefreshTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var codexRealtimeEventDatesBySessionID: [String: Date] = [:]
 
     init(
         terminalJumpAction: @escaping @Sendable (JumpTarget) throws -> String = { target in
@@ -1607,9 +1614,10 @@ final class AppModel {
         if ingress == .bridge {
             monitoring.markSessionAttached(for: event)
             monitoring.markSessionProcessAlive(for: event)
+            recordCodexRealtimeEventIfNeeded(event, sessionID: eventSessionID)
         }
         synchronizeSelection()
-        discovery.refreshCodexRolloutTracking()
+        refreshCodexRolloutTrackingWithRealtimeGate()
         refreshOverlayPlacementIfVisible()
         if state != stateBeforeEvent {
             scheduleSessionPersistence(
@@ -1701,6 +1709,58 @@ final class AppModel {
         }
         if scopes.contains(.cursor) {
             discovery.scheduleCursorSessionPersistence()
+        }
+    }
+
+    private func recordCodexRealtimeEventIfNeeded(_ event: AgentEvent, sessionID: String?) {
+        guard let sessionID,
+              Self.isCodexEvent(event, session: state.session(id: sessionID)) else {
+            return
+        }
+
+        codexRealtimeEventDatesBySessionID[sessionID] = codexShelfEventTimestamp(event) ?? Date()
+    }
+
+    nonisolated private static func isCodexEvent(_ event: AgentEvent, session: AgentSession?) -> Bool {
+        switch event {
+        case let .sessionStarted(payload):
+            return payload.tool == .codex
+        case .sessionMetadataUpdated:
+            return true
+        default:
+            return session?.tool == .codex
+        }
+    }
+
+    private func refreshCodexRolloutTrackingWithRealtimeGate(referenceDate: Date = Date()) {
+        let healthySessionIDs = healthyRealtimeCodexSessionIDs(referenceDate: referenceDate)
+        discovery.refreshCodexRolloutTracking(healthyRealtimeCodexSessionIDs: healthySessionIDs)
+        scheduleCodexRolloutFallbackRefreshIfNeeded(referenceDate: referenceDate)
+    }
+
+    private func healthyRealtimeCodexSessionIDs(referenceDate: Date) -> Set<String> {
+        codexRealtimeEventDatesBySessionID = codexRealtimeEventDatesBySessionID.filter { _, lastSeenAt in
+            referenceDate.timeIntervalSince(lastSeenAt) <= Self.codexRealtimeHealthWindow
+        }
+        return Set(codexRealtimeEventDatesBySessionID.keys)
+    }
+
+    private func scheduleCodexRolloutFallbackRefreshIfNeeded(referenceDate: Date) {
+        codexRolloutFallbackRefreshTask?.cancel()
+
+        guard let nextExpiry = codexRealtimeEventDatesBySessionID.values
+            .map({ $0.addingTimeInterval(Self.codexRealtimeHealthWindow) })
+            .min() else {
+            codexRolloutFallbackRefreshTask = nil
+            return
+        }
+
+        let delayMilliseconds = max(100, Int(nextExpiry.timeIntervalSince(referenceDate) * 1_000) + 100)
+        codexRolloutFallbackRefreshTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(delayMilliseconds))
+            await MainActor.run { [weak self] in
+                self?.refreshCodexRolloutTrackingWithRealtimeGate()
+            }
         }
     }
 

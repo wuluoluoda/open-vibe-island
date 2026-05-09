@@ -375,8 +375,20 @@ final class SessionDiscoveryCoordinator {
 
     // MARK: - Rollout tracking
 
-    func refreshCodexRolloutTracking() {
-        let targets = state.sessions.compactMap { session -> CodexRolloutWatchTarget? in
+    func refreshCodexRolloutTracking(healthyRealtimeCodexSessionIDs: Set<String> = []) {
+        let targets = Self.codexRolloutWatchTargets(
+            for: state.sessions,
+            healthyRealtimeCodexSessionIDs: healthyRealtimeCodexSessionIDs
+        )
+
+        codexRolloutWatcher.sync(targets: targets)
+    }
+
+    nonisolated static func codexRolloutWatchTargets(
+        for sessions: [AgentSession],
+        healthyRealtimeCodexSessionIDs: Set<String>
+    ) -> [CodexRolloutWatchTarget] {
+        sessions.compactMap { session -> CodexRolloutWatchTarget? in
             guard session.tool == .codex,
                   let transcriptPath = session.codexMetadata?.transcriptPath,
                   !transcriptPath.isEmpty else {
@@ -388,14 +400,15 @@ final class SessionDiscoveryCoordinator {
             if session.isCodexAppSession {
                 return nil
             }
+            if healthyRealtimeCodexSessionIDs.contains(session.id) {
+                return nil
+            }
 
             return CodexRolloutWatchTarget(
                 sessionID: session.id,
                 transcriptPath: transcriptPath
             )
         }
-
-        codexRolloutWatcher.sync(targets: targets)
     }
 
     // MARK: - Codex.app periodic re-discovery

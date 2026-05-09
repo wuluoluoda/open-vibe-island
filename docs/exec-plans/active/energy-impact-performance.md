@@ -29,6 +29,7 @@
 - Added a localized Settings-only global energy profile with compact `1 2 3` controls.
 - Mapped the global profile to monitor cadence and warm jump-target cache TTL defaults.
 - Scoped event-driven session persistence to the changed tool family and skipped persistence when an event produces no state change.
+- Gated Codex rollout watcher targets while a same-session real-time Codex channel is recently healthy, with fallback resuming after the health window expires.
 
 ## Completed Slice: On-Demand Usage Refresh
 
@@ -109,7 +110,7 @@ Keep the first implementation conservative: one global profile can map to intern
 
 Explicit module-level overrides remain deferred until a user need is clear.
 
-## Later Slice: Codex Rollout Fallback Gating
+## Completed Slice: Codex Rollout Fallback Gating
 
 Keep rollout file watching available for reliability, but avoid duplicating real-time event work:
 
