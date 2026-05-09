@@ -31,6 +31,7 @@ final class AppModel {
     private static let codexLoopSuspectedThresholdDefaultsKey = "feature.codex.loopSuspected.threshold"
     private static let codexShelfEnabledDefaultsKey = "feature.codex.shelf.enabled"
     private static let codexRadarEnabledDefaultsKey = "feature.codex.radar.enabled"
+    private static let energyProfileDefaultsKey = "app.energyProfile"
 
     static let defaultStatusColors: [SessionPhase: String] = [
         .running: "#6E9FFF",
@@ -341,6 +342,13 @@ final class AppModel {
             refreshOverlayPlacementIfVisible()
         }
     }
+    var energyProfile: EnergyProfile = .balanced {
+        didSet {
+            monitoring.energyProfile = energyProfile
+            guard hasFinishedInit, energyProfile != oldValue else { return }
+            UserDefaults.standard.set(energyProfile.rawValue, forKey: Self.energyProfileDefaultsKey)
+        }
+    }
     var launchAtLoginEnabled: Bool = false {
         didSet {
             guard !isApplyingLaunchAtLogin, hasFinishedInit, launchAtLoginEnabled != oldValue else { return }
@@ -632,6 +640,7 @@ final class AppModel {
             Self.codexLoopSuspectedThresholdDefaultsKey: 4,
             Self.codexShelfEnabledDefaultsKey: false,
             Self.codexRadarEnabledDefaultsKey: true,
+            Self.energyProfileDefaultsKey: EnergyProfile.balanced.rawValue,
         ])
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
         selectedSoundName = NotificationSoundService.selectedSoundName
@@ -658,6 +667,9 @@ final class AppModel {
         codexShelfEnabled = codexShelfEnabledOverride
             ?? UserDefaults.standard.bool(forKey: Self.codexShelfEnabledDefaultsKey)
         codexRadarEnabled = UserDefaults.standard.bool(forKey: Self.codexRadarEnabledDefaultsKey)
+        energyProfile = EnergyProfile(
+            rawValue: UserDefaults.standard.integer(forKey: Self.energyProfileDefaultsKey)
+        ) ?? .balanced
         launchAtLoginEnabled = LaunchAtLoginService.shared.isEnabled
         islandAppearanceMode = IslandAppearanceMode(
             rawValue: UserDefaults.standard.string(forKey: Self.islandAppearanceModeDefaultsKey) ?? ""
@@ -739,6 +751,7 @@ final class AppModel {
         }
 
         monitoring.syntheticClaudeSessionPrefix = Self.syntheticClaudeSessionPrefix
+        monitoring.energyProfile = energyProfile
         monitoring.stateAccessor = { [weak self] in self?.state ?? SessionState() }
         monitoring.stateUpdater = { [weak self] in self?.state = $0 }
         monitoring.onSessionsReconciled = { [weak self] in

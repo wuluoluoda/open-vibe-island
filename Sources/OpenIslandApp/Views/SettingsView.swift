@@ -230,6 +230,31 @@ struct GeneralSettingsPane: View {
                 ))
             }
 
+            Section(lang.t("settings.energy.section")) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(lang.t("settings.energy.mode"))
+                        Text(lang.t(model.energyProfile.localizedDescriptionKey))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Picker(lang.t("settings.energy.mode"), selection: Binding(
+                        get: { model.energyProfile },
+                        set: { model.energyProfile = $0 }
+                    )) {
+                        ForEach(EnergyProfile.allCases) { profile in
+                            Text("\(profile.rawValue)").tag(profile)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 124)
+                }
+            }
+
             Section {
                 Toggle(lang.t("settings.general.codexShelf"), isOn: Binding(
                     get: { model.codexShelfEnabled },

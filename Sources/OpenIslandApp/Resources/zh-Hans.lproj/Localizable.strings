@@ -52,6 +52,11 @@
 "settings.general.codexIslandHint" = "产物 Shelf 仍是 Beta 功能。Stalled 和 Loop 仅作为保守提示。如果干扰较大，可在此关闭实验信号。";
 "settings.general.minutes" = "%lld 分钟";
 "settings.general.attempts" = "%lld 次";
+"settings.energy.section" = "能耗";
+"settings.energy.mode" = "模式";
+"settings.energy.profile.quiet.desc" = "尽量减少后台探测";
+"settings.energy.profile.balanced.desc" = "均衡默认设置";
+"settings.energy.profile.responsive.desc" = "更快的响应检查";
 
 /* Settings - Appearance */
 "settings.tab.appearance" = "个性化";

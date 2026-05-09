@@ -13,6 +13,8 @@ final class ProcessMonitoringCoordinator {
 
     var isResolvingInitialLiveSessions = false
 
+    var energyProfile: EnergyProfile = .balanced
+
     @ObservationIgnored
     var syntheticClaudeSessionPrefix = ""
 
@@ -109,7 +111,8 @@ final class ProcessMonitoringCoordinator {
                 let nextLiveSessions = self.state.sessions.filter(\.isTrackedLiveSession)
                 let sleepDuration = Self.monitorSleepDuration(
                     for: nextLiveSessions,
-                    isResolvingInitialLiveSessions: self.isResolvingInitialLiveSessions
+                    isResolvingInitialLiveSessions: self.isResolvingInitialLiveSessions,
+                    energyProfile: self.energyProfile
                 )
                 try? await Task.sleep(for: sleepDuration)
             }
@@ -118,20 +121,21 @@ final class ProcessMonitoringCoordinator {
 
     nonisolated static func monitorSleepDuration(
         for liveSessions: [AgentSession],
-        isResolvingInitialLiveSessions: Bool
+        isResolvingInitialLiveSessions: Bool,
+        energyProfile: EnergyProfile = .balanced
     ) -> Duration {
         if isResolvingInitialLiveSessions {
-            return .seconds(2)
+            return energyProfile.activeMonitorCadence
         }
 
         guard !liveSessions.isEmpty else {
-            return .seconds(8)
+            return energyProfile.idleMonitorCadence
         }
 
         let hasActiveWork = liveSessions.contains {
             $0.phase == .running || $0.phase.requiresAttention
         }
-        return hasActiveWork ? .seconds(2) : .seconds(5)
+        return hasActiveWork ? energyProfile.activeMonitorCadence : energyProfile.quietMonitorCadence
     }
 
     nonisolated private static func shouldCollectTerminalSnapshots(
@@ -314,7 +318,11 @@ final class ProcessMonitoringCoordinator {
 
     func cachedJumpTarget(for sessionID: String, now: Date = Date()) -> JumpTarget? {
         guard let entry = jumpTargetCache[sessionID],
-              Self.cachedJumpTargetIsFresh(resolvedAt: entry.resolvedAt, now: now) else {
+              Self.cachedJumpTargetIsFresh(
+                resolvedAt: entry.resolvedAt,
+                now: now,
+                ttl: energyProfile.jumpTargetCacheTTL
+              ) else {
             return nil
         }
         return entry.target

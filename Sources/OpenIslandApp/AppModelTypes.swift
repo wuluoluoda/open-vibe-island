@@ -20,6 +20,54 @@ enum TrackedEventIngress {
     case rollout
 }
 
+enum EnergyProfile: Int, CaseIterable, Identifiable, Sendable {
+    case quiet = 1
+    case balanced = 2
+    case responsive = 3
+
+    var id: Int { rawValue }
+
+    var activeMonitorCadence: Duration {
+        switch self {
+        case .quiet: .seconds(3)
+        case .balanced: .seconds(2)
+        case .responsive: .seconds(1)
+        }
+    }
+
+    var quietMonitorCadence: Duration {
+        switch self {
+        case .quiet: .seconds(8)
+        case .balanced: .seconds(5)
+        case .responsive: .seconds(3)
+        }
+    }
+
+    var idleMonitorCadence: Duration {
+        switch self {
+        case .quiet: .seconds(12)
+        case .balanced: .seconds(8)
+        case .responsive: .seconds(5)
+        }
+    }
+
+    var jumpTargetCacheTTL: TimeInterval {
+        switch self {
+        case .quiet: 30
+        case .balanced: 25
+        case .responsive: 20
+        }
+    }
+
+    var localizedDescriptionKey: String {
+        switch self {
+        case .quiet: "settings.energy.profile.quiet.desc"
+        case .balanced: "settings.energy.profile.balanced.desc"
+        case .responsive: "settings.energy.profile.responsive.desc"
+        }
+    }
+}
+
 enum RuntimeConnectionState: String, Sendable {
     case disconnected
     case connecting

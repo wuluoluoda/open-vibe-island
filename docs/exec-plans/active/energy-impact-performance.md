@@ -26,6 +26,8 @@
 - Removed full jump-target precision resolution from the background monitor loop.
 - Added a short-lived warm jump-target cache that prewarms near island opening, hover, notifications, selection changes, and running/actionable events.
 - Clicks use a fresh cached target immediately, otherwise fall back to the latest known target and schedule a repair prewarm.
+- Added a localized Settings-only global energy profile with compact `1 2 3` controls.
+- Mapped the global profile to monitor cadence and warm jump-target cache TTL defaults.
 
 ## Completed Slice: On-Demand Usage Refresh
 
@@ -66,7 +68,7 @@ This does not conflict with weakening `attached` / `stale` / `detached` monitori
 - Prefer event or process liveness signals over terminal-window precision for normal display.
 - Run precise terminal attachment checks when preparing jump targets or when a session is old enough to need cleanup.
 
-## Later Slice: Energy Profiles And Module Overrides
+## Completed Slice: Energy Profiles
 
 Support coarse energy profiles first, then allow advanced users to override large modules individually. The app is a small island, so it is reasonable to expose a few clear controls instead of forcing one global behavior.
 
@@ -103,6 +105,8 @@ Example copy shape:
 - `Hover 1 2 3`: `Throttled hover tracking`
 
 Keep the first implementation conservative: one global profile can map to internal module defaults, and explicit module overrides can be added only where users need the control.
+
+Explicit module-level overrides remain deferred until a user need is clear.
 
 ## Later Slice: Codex Rollout Fallback Gating
 

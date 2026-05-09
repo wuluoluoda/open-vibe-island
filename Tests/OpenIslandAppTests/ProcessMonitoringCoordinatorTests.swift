@@ -55,6 +55,27 @@ struct ProcessMonitoringCoordinatorTests {
     }
 
     @Test
+    func monitorSleepDurationUsesEnergyProfileCadences() {
+        #expect(ProcessMonitoringCoordinator.monitorSleepDuration(
+            for: [],
+            isResolvingInitialLiveSessions: false,
+            energyProfile: .quiet
+        ) == .seconds(12))
+
+        #expect(ProcessMonitoringCoordinator.monitorSleepDuration(
+            for: [runningSession()],
+            isResolvingInitialLiveSessions: false,
+            energyProfile: .responsive
+        ) == .seconds(1))
+
+        #expect(ProcessMonitoringCoordinator.monitorSleepDuration(
+            for: [completedSession()],
+            isResolvingInitialLiveSessions: false,
+            energyProfile: .quiet
+        ) == .seconds(8))
+    }
+
+    @Test
     func cachedJumpTargetFreshnessHonorsTTL() {
         let resolvedAt = Date(timeIntervalSince1970: 1_000)
 
@@ -119,6 +140,48 @@ struct ProcessMonitoringCoordinatorTests {
             now: resolvedAt.addingTimeInterval(31)
         ) == sessionTarget)
     }
+
+    @Test
+    @MainActor
+    func cachedJumpTargetUsesSelectedEnergyProfileTTL() {
+        let coordinator = ProcessMonitoringCoordinator()
+        let resolvedAt = Date(timeIntervalSince1970: 4_000)
+        let target = jumpTarget(title: "responsive")
+
+        coordinator.energyProfile = .responsive
+        coordinator.cacheJumpTarget(target, for: "session", resolvedAt: resolvedAt)
+
+        #expect(coordinator.cachedJumpTarget(
+            for: "session",
+            now: resolvedAt.addingTimeInterval(19.9)
+        ) == target)
+        #expect(coordinator.cachedJumpTarget(
+            for: "session",
+            now: resolvedAt.addingTimeInterval(20.1)
+        ) == nil)
+    }
+}
+
+private func runningSession() -> AgentSession {
+    AgentSession(
+        id: "running",
+        title: "Running",
+        tool: .codex,
+        phase: .running,
+        summary: "Running",
+        updatedAt: .now
+    )
+}
+
+private func completedSession() -> AgentSession {
+    AgentSession(
+        id: "completed",
+        title: "Completed",
+        tool: .codex,
+        phase: .completed,
+        summary: "Done",
+        updatedAt: .now
+    )
 }
 
 private func jumpTarget(title: String) -> JumpTarget {

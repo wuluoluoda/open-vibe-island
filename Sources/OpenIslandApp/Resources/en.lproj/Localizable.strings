@@ -52,6 +52,11 @@
 "settings.general.codexIslandHint" = "Artifact Shelf is a Beta feature. Stalled and loop signals are conservative hints only. Disable experimental signals here if they feel noisy.";
 "settings.general.minutes" = "%lld min";
 "settings.general.attempts" = "%lld attempts";
+"settings.energy.section" = "Energy";
+"settings.energy.mode" = "Mode";
+"settings.energy.profile.quiet.desc" = "Minimum background probes";
+"settings.energy.profile.balanced.desc" = "Balanced defaults";
+"settings.energy.profile.responsive.desc" = "More responsive checks";
 
 /* Settings - Appearance */
 "settings.tab.appearance" = "Appearance";
