@@ -5,7 +5,7 @@ This project uses the Safe Tool Versioning workflow because Open Island is a loc
 ## Branch Roles
 
 - `main`: shared integration branch. Keep it stable and update it through PR/integration only.
-- `codex/codex-island-suite`: current local continuous-testing branch for the Codex island workstream. When the user asks whether the local app has a fix, this branch is the first branch to inspect unless they name another one.
+- `dev`: current local continuous-testing branch for the Codex island workstream. When the user asks whether the local app has a fix, this branch is the first branch to inspect unless they name another one.
 - `fix/<topic>`: one bug fix.
 - `feat/<topic>`: one feature.
 - `docs/<topic>`: one documentation or workflow change.
@@ -36,13 +36,13 @@ For work intended for `main`, prefer `origin/main`:
 
 ```bash
 git fetch --all --prune
-git worktree add -b fix/<topic> ../open-vibe-island-<topic> origin/main
+git worktree add -b fix/<topic> ../code.app.org-<topic> origin/main
 ```
 
 For a bug that exists in the currently running local dev app, branch from the current local testing branch:
 
 ```bash
-git worktree add -b fix/<topic> ../open-vibe-island-<topic> codex/codex-island-suite
+git worktree add -b fix/<topic> ../code.app.org-<topic> dev
 ```
 
 Say which base you chose and why. This avoids the confusion where a fix exists on an unrelated branch but the app the user is running never receives it.
@@ -69,10 +69,10 @@ Keep unrelated changes in separate commits.
 
 ## Integrating Into The Local Testing Branch
 
-When the user asks to use a fix in the current app, integrate it into `codex/codex-island-suite` unless they specify another branch.
+When the user asks to use a fix in the current app, integrate it into `dev` unless they specify another branch.
 
 ```bash
-cd /Users/wuluoluo/Documents/open-vibe-island
+cd /Users/wuluoluo/work/code.app.org
 git status -sb
 git merge --ff-only <topic-branch>
 ```
@@ -184,9 +184,8 @@ Do not use destructive commands such as `git reset --hard` unless the user expli
 Every final summary after code or workflow changes should mention:
 
 - branch and commit
-- whether it has been merged into `codex/codex-island-suite`, `main`, or only a topic branch
+- whether it has been merged into `dev`, `main`, or only a topic branch
 - verification command and result
 - running app evidence when the app was refreshed
 - tag name if a build or release tag was created
 - verification gaps, if any
-

@@ -11,21 +11,21 @@ This repository should use Git worktrees as the default shape for development.
 
 ## Roles
 
-### 1. Integration worktree
+### 1. Local testing worktree
 
-- Path: `/Users/wuluoluo/Documents/open-vibe-island`
-- Branch: `main`
-- Purpose: fetch, mirror `main` after PR merges, and verify
+- Path: `/Users/wuluoluo/work/code.app.org`
+- Branch: `dev`
+- Purpose: run and verify the current local Dev app
 
 Rules:
 
-- Do not start feature work here.
-- Do not edit, commit, or push directly on `main`.
-- Only use this worktree to inspect the overall state, fetch, update local `main` with `git pull --ff-only`, and run final verification after PRs merge.
+- Keep it as the branch that backs `~/Applications/Open Island Dev.app`.
+- Create topic worktrees from `dev` when fixing behavior already visible in the running local app.
+- Integrate completed local-app fixes here after they have been committed on their topic branches.
 
 ### 2. Topic worktrees
 
-- Path pattern: `/Users/wuluoluo/Documents/open-vibe-island-<topic>`
+- Path pattern: `/Users/wuluoluo/work/code.app.org-<topic>`
 - Branch pattern: `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, `investigate/<topic>`
 - Purpose: isolated implementation for one slice
 
@@ -40,24 +40,24 @@ Rules:
 
 ### Create a new topic worktree
 
-From the integration worktree:
+From the local testing worktree, or any clean checkout:
 
 ```bash
 git fetch origin
-git worktree add /Users/wuluoluo/Documents/open-vibe-island-<topic> -b <branch-name> origin/main
+git worktree add /Users/wuluoluo/work/code.app.org-<topic> -b <branch-name> origin/main
 ```
 
 Example:
 
 ```bash
 git fetch origin
-git worktree add /Users/wuluoluo/Documents/open-vibe-island-island-polish -b feat/island-polish origin/main
+git worktree add /Users/wuluoluo/work/code.app.org-island-polish -b feat/island-polish origin/main
 ```
 
 If the bug exists in the current local testing branch rather than `origin/main`, branch from that testing branch and state that choice:
 
 ```bash
-git worktree add /Users/wuluoluo/Documents/open-vibe-island-row-jump -b fix/row-jump codex/codex-island-suite
+git worktree add /Users/wuluoluo/work/code.app.org-row-jump -b fix/row-jump dev
 ```
 
 ## Work inside the topic worktree
@@ -88,7 +88,7 @@ If rebase is risky for that slice, merge `origin/main` into the topic branch exp
 
 First make sure the topic worktree is committed and verified.
 
-Push the feature branch and open a PR targeting `main`. After the PR merges, return to the integration worktree:
+Push the feature branch and open a PR targeting `main`. After the PR merges, update a clean `main` checkout:
 
 ```bash
 git switch main
@@ -99,14 +99,14 @@ git pull --ff-only origin main
 ## Push policy
 
 - Push topic branches when you want backup, review, or collaboration.
-- Do not push `main` directly. Merge through PRs, then update the integration worktree with `git pull --ff-only`.
+- Do not push `main` directly. Merge through PRs, then update any local `main` checkout with `git pull --ff-only`.
 
 ## Cleanup
 
 After the topic branch is merged:
 
 ```bash
-git worktree remove /Users/wuluoluo/Documents/open-vibe-island-<topic>
+git worktree remove /Users/wuluoluo/work/code.app.org-<topic>
 git branch -d <branch-name>
 ```
 
@@ -119,7 +119,7 @@ git push origin --delete <branch-name>
 ## Recommended Conventions
 
 - Keep topic names short and concrete: `codex-hooks-noise`, `island-geometry`, `claude-usage`.
-- Prefer sibling directories under `/Users/wuluoluo/Documents/` so all worktrees stay easy to discover.
+- Prefer sibling directories under `/Users/wuluoluo/work/` so all worktrees stay easy to discover.
 - Do not leave long-lived unmerged worktrees drifting far away from `origin/main`.
 - If a worktree becomes exploratory rather than shippable, rename the branch into `investigate/<topic>` or close it.
 - When assigning work to multiple agents, split by file ownership or subsystem, not by vague goal.
