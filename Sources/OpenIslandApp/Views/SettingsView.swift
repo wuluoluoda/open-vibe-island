@@ -106,6 +106,9 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openIslandSelectSetupTab)) { _ in
             selectedTab = .setup
         }
+        .onAppear {
+            model.refreshUsageStateForVisibleSurface()
+        }
     }
 
     // MARK: Sidebar

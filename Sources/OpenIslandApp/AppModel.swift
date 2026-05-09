@@ -199,6 +199,12 @@ final class AppModel {
     func refreshCursorHookStatus() { hooks.refreshCursorHookStatus() }
     func refreshClaudeUsageState() { hooks.refreshClaudeUsageState() }
     func refreshCodexUsageState() { hooks.refreshCodexUsageState() }
+    func refreshUsageStateForVisibleSurface() {
+        hooks.refreshClaudeUsageState()
+        if showCodexUsage {
+            hooks.refreshCodexUsageState()
+        }
+    }
     func installCodexHooks() { hooks.installCodexHooks() }
     func uninstallCodexHooks() { hooks.uninstallCodexHooks() }
     func installClaudeHooks() { hooks.installClaudeHooks() }
@@ -279,6 +285,9 @@ final class AppModel {
         didSet {
             guard hasFinishedInit, showCodexUsage != oldValue else { return }
             UserDefaults.standard.set(showCodexUsage, forKey: Self.showCodexUsageDefaultsKey)
+            if showCodexUsage {
+                hooks.refreshCodexUsageState()
+            }
         }
     }
     var completionReplyEnabled: Bool = false {
@@ -1067,12 +1076,6 @@ final class AppModel {
             hooks.refreshCCForkHookStatuses()
             hooks.refreshOpenCodePluginStatus()
             hooks.refreshCursorHookStatus()
-            hooks.refreshClaudeUsageState()
-            hooks.startClaudeUsageMonitoringIfNeeded()
-            if showCodexUsage {
-                hooks.refreshCodexUsageState()
-                hooks.startCodexUsageMonitoringIfNeeded()
-            }
             updateChecker.startIfNeeded()
 
         } else {

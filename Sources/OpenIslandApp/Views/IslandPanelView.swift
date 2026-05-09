@@ -272,6 +272,11 @@ struct IslandPanelView: View {
         } message: {
             Text(model.lang.t("island.quit.confirmMessage"))
         }
+        .onChange(of: model.notchStatus) { _, status in
+            if status == .opened {
+                model.refreshUsageStateForVisibleSurface()
+            }
+        }
     }
 
     @ViewBuilder

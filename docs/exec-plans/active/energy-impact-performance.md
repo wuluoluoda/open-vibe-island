@@ -20,8 +20,11 @@
 - Reduced process monitoring cadence from a fixed 2 second loop to active, quiet, and idle cadences.
 - Skipped terminal snapshot and jump target resolver work when there are no live sessions and no active agent processes.
 - Added tests for monitor sleep cadence.
+- Removed default Claude and Codex usage polling loops from startup.
+- Refresh usage data on demand when Settings or the opened island usage surface is shown, and when Codex usage is enabled.
+- Keep cached usage values while the usage UI is closed; setup and diagnostics flows still call the manual refresh methods.
 
-## Immediate Slice: On-Demand Usage Refresh
+## Completed Slice: On-Demand Usage Refresh
 
 Codex and Claude usage totals are useful context, but they are not part of the core display, notification, and jump-back loop. The current Claude usage monitor is especially worth fixing because it refreshes every 5 seconds after app startup.
 

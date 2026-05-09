@@ -91,12 +91,6 @@ final class HookInstallationCoordinator {
     }
 
     @ObservationIgnored
-    private var claudeUsageMonitorTask: Task<Void, Never>?
-
-    @ObservationIgnored
-    private var codexUsageMonitorTask: Task<Void, Never>?
-
-    @ObservationIgnored
     private var relativeTimestampFormatter: RelativeDateTimeFormatter {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
@@ -1064,34 +1058,6 @@ final class HookInstallationCoordinator {
     func uninstallClaudeUsageBridge() {
         updateClaudeUsageBridge(userMessage: "Removing Claude usage bridge.", intent: .uninstalled) { manager in
             try manager.uninstall()
-        }
-    }
-
-    // MARK: - Monitoring
-
-    func startClaudeUsageMonitoringIfNeeded() {
-        guard claudeUsageMonitorTask == nil else { return }
-
-        claudeUsageMonitorTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-
-            while !Task.isCancelled {
-                self.refreshClaudeUsageState()
-                try? await Task.sleep(for: .seconds(5))
-            }
-        }
-    }
-
-    func startCodexUsageMonitoringIfNeeded() {
-        guard codexUsageMonitorTask == nil else { return }
-
-        codexUsageMonitorTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-
-            while !Task.isCancelled {
-                self.refreshCodexUsageState()
-                try? await Task.sleep(for: .seconds(120))
-            }
         }
     }
 
