@@ -13,12 +13,24 @@
 - Codex rollout file watching is used as a fallback when real-time channels are unavailable, not as duplicate high-frequency work when live events are healthy.
 - Session persistence is scheduled only for the agent family that changed.
 - Optional surfaces such as shelves, usage details, and settings diagnostics stay out of the always-on path unless explicitly enabled or opened.
+- Users can choose an energy profile, with optional per-module overrides for the larger background-cost areas.
 
 ## Completed Slice
 
 - Reduced process monitoring cadence from a fixed 2 second loop to active, quiet, and idle cadences.
 - Skipped terminal snapshot and jump target resolver work when there are no live sessions and no active agent processes.
 - Added tests for monitor sleep cadence.
+
+## Immediate Slice: On-Demand Usage Refresh
+
+Codex and Claude usage totals are useful context, but they are not part of the core display, notification, and jump-back loop. The current Claude usage monitor is especially worth fixing because it refreshes every 5 seconds after app startup.
+
+- Remove default high-frequency Claude usage monitoring from startup.
+- Do not poll Codex or Claude usage data on a background loop by default.
+- Refresh immediately when the user opens the settings or usage surface.
+- Refresh immediately when the UI exposes per-conversation token or mtoken cost.
+- Use cached values while the usage UI is closed.
+- Preserve manual refresh behavior for setup or diagnostics flows.
 
 ## Next Slice: Warm Jump Target Cache
 
@@ -48,15 +60,25 @@ This does not conflict with weakening `attached` / `stale` / `detached` monitori
 - Prefer event or process liveness signals over terminal-window precision for normal display.
 - Run precise terminal attachment checks when preparing jump targets or when a session is old enough to need cleanup.
 
-## Later Slice: On-Demand Usage Refresh
+## Later Slice: Energy Profiles And Module Overrides
 
-Codex and Claude usage totals are useful context, but they are not part of the core display, notification, and jump-back loop. If refreshing is effectively immediate, prefer demand-driven refresh over any periodic monitoring:
+Support coarse energy profiles first, then allow advanced users to override large modules individually. The app is a small island, so it is reasonable to expose a few clear controls instead of forcing one global behavior.
 
-- Do not poll usage data on a background loop by default.
-- Refresh immediately when the user opens the settings or usage surface.
-- Refresh immediately when the UI exposes per-conversation token or mtoken cost.
-- Use cached values while the usage UI is closed.
-- Preserve manual refresh behavior for setup or diagnostics flows.
+Suggested global profiles:
+
+- `Responsive`: shortest refresh windows, best jump precision, higher background work.
+- `Balanced`: default profile; event-driven first, moderate pre-warm, reduced idle work.
+- `Quiet`: minimum background probes; refresh and precise checks happen mostly on demand.
+
+Candidate module-level overrides:
+
+- Jump target precision: `eager`, `prewarm`, or `on demand`.
+- Terminal attachment reconciliation: `normal`, `low frequency`, or `cleanup only`.
+- Usage refresh: `on demand`, `low frequency`, or `off`.
+- Codex rollout fallback: `always watch`, `fallback gated`, or `off when app-server is healthy`.
+- Overlay hover monitoring: `responsive`, `balanced`, or `click only`.
+
+Keep the first implementation conservative: one global profile can map to internal module defaults, and explicit module overrides can be added only where users need the control.
 
 ## Later Slice: Codex Rollout Fallback Gating
 
@@ -80,9 +102,10 @@ Avoid scheduling every persistence store after every event:
 
 ## Verification Path
 
+- Unit test usage refresh triggers if the implementation adds an explicit usage-refresh coordinator.
 - Unit test the cache freshness and click-time fallback policy.
 - Unit test attachment reconciliation cadence if it receives its own scheduler.
-- Unit test usage refresh triggers if the implementation adds an explicit usage-refresh coordinator.
+- Unit test energy profile mapping if profile settings are introduced.
 - Unit test rollout fallback gating for healthy and disconnected real-time channels.
 - Unit test tool-scoped persistence scheduling and no-op event short-circuiting.
 - Run `swift test`.
