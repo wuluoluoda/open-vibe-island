@@ -77,6 +77,57 @@ enum EnergyProfile: Int, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum EnergyModule: String, CaseIterable, Identifiable, Sendable {
+    case jump
+    case usage
+    case attach
+    case codexLog
+    case hover
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .jump: "settings.energy.module.jump"
+        case .usage: "settings.energy.module.usage"
+        case .attach: "settings.energy.module.attach"
+        case .codexLog: "settings.energy.module.codexLog"
+        case .hover: "settings.energy.module.hover"
+        }
+    }
+
+    func defaultProfile(for globalProfile: EnergyProfile) -> EnergyProfile {
+        switch self {
+        case .usage:
+            globalProfile == .responsive ? .balanced : .quiet
+        case .attach:
+            globalProfile == .quiet ? .quiet : .balanced
+        case .jump, .codexLog, .hover:
+            globalProfile
+        }
+    }
+
+    func descriptionKey(for profile: EnergyProfile) -> String {
+        switch (self, profile) {
+        case (.jump, .quiet): "settings.energy.jump.quiet.desc"
+        case (.jump, .balanced): "settings.energy.jump.balanced.desc"
+        case (.jump, .responsive): "settings.energy.jump.responsive.desc"
+        case (.usage, .quiet): "settings.energy.usage.quiet.desc"
+        case (.usage, .balanced): "settings.energy.usage.balanced.desc"
+        case (.usage, .responsive): "settings.energy.usage.responsive.desc"
+        case (.attach, .quiet): "settings.energy.attach.quiet.desc"
+        case (.attach, .balanced): "settings.energy.attach.balanced.desc"
+        case (.attach, .responsive): "settings.energy.attach.responsive.desc"
+        case (.codexLog, .quiet): "settings.energy.codexLog.quiet.desc"
+        case (.codexLog, .balanced): "settings.energy.codexLog.balanced.desc"
+        case (.codexLog, .responsive): "settings.energy.codexLog.responsive.desc"
+        case (.hover, .quiet): "settings.energy.hover.quiet.desc"
+        case (.hover, .balanced): "settings.energy.hover.balanced.desc"
+        case (.hover, .responsive): "settings.energy.hover.responsive.desc"
+        }
+    }
+}
+
 enum RuntimeConnectionState: String, Sendable {
     case disconnected
     case connecting

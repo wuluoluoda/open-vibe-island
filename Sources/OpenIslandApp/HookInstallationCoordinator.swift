@@ -91,6 +91,9 @@ final class HookInstallationCoordinator {
     }
 
     @ObservationIgnored
+    private var usageRefreshMonitorTask: Task<Void, Never>?
+
+    @ObservationIgnored
     private var relativeTimestampFormatter: RelativeDateTimeFormatter {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
@@ -777,6 +780,39 @@ final class HookInstallationCoordinator {
             } catch {
                 self.onStatusMessage?("Failed to read Codex usage state: \(error.localizedDescription)")
             }
+        }
+    }
+
+    func configureUsageRefreshMonitoring(profile: EnergyProfile, includeCodex: Bool) {
+        usageRefreshMonitorTask?.cancel()
+        usageRefreshMonitorTask = nil
+
+        guard let interval = Self.usageRefreshInterval(for: profile) else {
+            return
+        }
+
+        usageRefreshMonitorTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: interval)
+                guard !Task.isCancelled else { return }
+                self.refreshClaudeUsageState()
+                if includeCodex {
+                    self.refreshCodexUsageState()
+                }
+            }
+        }
+    }
+
+    nonisolated static func usageRefreshInterval(for profile: EnergyProfile) -> Duration? {
+        switch profile {
+        case .quiet:
+            nil
+        case .balanced:
+            .seconds(300)
+        case .responsive:
+            .seconds(60)
         }
     }
 

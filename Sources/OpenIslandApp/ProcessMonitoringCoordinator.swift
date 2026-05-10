@@ -14,6 +14,8 @@ final class ProcessMonitoringCoordinator {
     var isResolvingInitialLiveSessions = false
 
     var energyProfile: EnergyProfile = .balanced
+    var jumpTargetPrecisionProfile: EnergyProfile = .balanced
+    var attachmentReconciliationProfile: EnergyProfile = .balanced
 
     @ObservationIgnored
     var syntheticClaudeSessionPrefix = ""
@@ -89,7 +91,7 @@ final class ProcessMonitoringCoordinator {
                 let liveSessions = self.state.sessions.filter(\.isTrackedLiveSession)
                 let lastTerminalSnapshotProbeDate = self.lastTerminalSnapshotProbeDate
                 let isResolvingInitialLiveSessions = self.isResolvingInitialLiveSessions
-                let energyProfile = self.energyProfile
+                let attachmentReconciliationProfile = self.attachmentReconciliationProfile
                 let (snapshots, ghosttyAvail, terminalAvail, didCollectTerminalSnapshots): (
                     [ActiveProcessSnapshot],
                     GhosttyAvailability?,
@@ -105,7 +107,7 @@ final class ProcessMonitoringCoordinator {
                         isResolvingInitialLiveSessions: isResolvingInitialLiveSessions,
                         lastTerminalSnapshotProbeDate: lastTerminalSnapshotProbeDate,
                         now: now,
-                        energyProfile: energyProfile
+                        energyProfile: attachmentReconciliationProfile
                     ) else {
                         return (s, nil, nil, false)
                     }
@@ -356,7 +358,7 @@ final class ProcessMonitoringCoordinator {
               Self.cachedJumpTargetIsFresh(
                 resolvedAt: entry.resolvedAt,
                 now: now,
-                ttl: energyProfile.jumpTargetCacheTTL
+                ttl: jumpTargetPrecisionProfile.jumpTargetCacheTTL
               ) else {
             return nil
         }

@@ -26,8 +26,9 @@
 - Removed full jump-target precision resolution from the background monitor loop.
 - Added a short-lived warm jump-target cache that prewarms near island opening, hover, notifications, selection changes, and running/actionable events.
 - Clicks use a fresh cached target immediately, otherwise fall back to the latest known target and schedule a repair prewarm.
-- Added a localized Settings-only global energy profile with compact `1 2 3` controls.
-- Mapped the global profile to monitor cadence and warm jump-target cache TTL defaults.
+- Added a localized Settings-only energy page with compact `1 2 3` controls.
+- Added a one-line `1 Quiet / 2 Balanced / 3 Responsive` summary plus module-level rows for Jump, Usage, Attach, Codex Log, and Hover.
+- Mapped the global profile to monitor cadence and module defaults, with explicit per-module overrides for larger background-cost areas.
 - Scoped event-driven session persistence to the changed tool family and skipped persistence when an event produces no state change.
 - Gated Codex rollout watcher targets while a same-session real-time Codex channel is recently healthy, with fallback resuming after the health window expires.
 - Moved precise terminal attachment snapshot reconciliation to a lower cadence while retaining startup checks and process/event-driven liveness between probes.
@@ -107,9 +108,7 @@ Example copy shape:
 - `Codex Log 1 2 3`: `Fallback when live channel is stale`
 - `Hover 1 2 3`: `Throttled hover tracking`
 
-Keep the first implementation conservative: one global profile can map to internal module defaults, and explicit module overrides can be added only where users need the control.
-
-Explicit module-level overrides remain deferred until a user need is clear.
+Keep the first implementation conservative: the global profile maps to internal module defaults, and explicit module overrides are exposed for the high-cost areas users may need to tune.
 
 ## Completed Slice: Codex Rollout Fallback Gating
 

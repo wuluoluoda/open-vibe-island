@@ -199,7 +199,7 @@ struct ProcessMonitoringCoordinatorTests {
         let resolvedAt = Date(timeIntervalSince1970: 4_000)
         let target = jumpTarget(title: "responsive")
 
-        coordinator.energyProfile = .responsive
+        coordinator.jumpTargetPrecisionProfile = .responsive
         coordinator.cacheJumpTarget(target, for: "session", resolvedAt: resolvedAt)
 
         #expect(coordinator.cachedJumpTarget(

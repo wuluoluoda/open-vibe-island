@@ -6,6 +6,7 @@ import OpenIslandCore
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
+    case energy
     case setup
     case display
     case sound
@@ -20,6 +21,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     func label(_ lang: LanguageManager) -> String {
         switch self {
         case .general:    lang.t("settings.tab.general")
+        case .energy:     lang.t("settings.tab.energy")
         case .setup:      lang.t("settings.tab.setup")
         case .appearance: lang.t("settings.tab.appearance")
         case .display:    lang.t("settings.tab.display")
@@ -34,6 +36,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .general:    "gearshape.fill"
+        case .energy:     "bolt.fill"
         case .setup:      "arrow.down.circle.fill"
         case .appearance: "paintbrush.fill"
         case .display:    "textformat.size"
@@ -48,6 +51,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var iconColor: Color {
         switch self {
         case .general:    .gray
+        case .energy:     .yellow
         case .setup:      .orange
         case .appearance: .purple
         case .display:    .blue
@@ -61,9 +65,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var section: SettingsSection {
         switch self {
-        case .general, .setup, .display, .sound, .appearance, .watch: .system
-        case .shortcuts, .lab:                                        .advanced
-        case .about:                                                  .app
+        case .general, .energy, .setup, .display, .sound, .appearance, .watch: .system
+        case .shortcuts, .lab:                                                 .advanced
+        case .about:                                                           .app
         }
     }
 }
@@ -141,6 +145,8 @@ struct SettingsView: View {
             switch selectedTab {
             case .general:
                 GeneralSettingsPane(model: model)
+            case .energy:
+                EnergySettingsPane(model: model)
             case .setup:
                 SetupSettingsPane(model: model)
             case .appearance:
@@ -230,31 +236,6 @@ struct GeneralSettingsPane: View {
                 ))
             }
 
-            Section(lang.t("settings.energy.section")) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(lang.t("settings.energy.mode"))
-                        Text(lang.t(model.energyProfile.localizedDescriptionKey))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Picker(lang.t("settings.energy.mode"), selection: Binding(
-                        get: { model.energyProfile },
-                        set: { model.energyProfile = $0 }
-                    )) {
-                        ForEach(EnergyProfile.allCases) { profile in
-                            Text("\(profile.rawValue)").tag(profile)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 124)
-                }
-            }
-
             Section {
                 Toggle(lang.t("settings.general.codexShelf"), isOn: Binding(
                     get: { model.codexShelfEnabled },
@@ -293,6 +274,111 @@ struct GeneralSettingsPane: View {
         }
         .formStyle(.grouped)
         .navigationTitle(lang.t("settings.tab.general"))
+    }
+}
+
+// MARK: - Energy
+
+struct EnergySettingsPane: View {
+    var model: AppModel
+
+    private var lang: LanguageManager { model.lang }
+
+    var body: some View {
+        Form {
+            Section(lang.t("settings.energy.section")) {
+                energyProfileRow(
+                    title: lang.t("settings.energy.mode"),
+                    description: lang.t(model.energyProfile.localizedDescriptionKey),
+                    selection: Binding(
+                        get: { model.energyProfile },
+                        set: { model.energyProfile = $0 }
+                    )
+                )
+
+                Text(lang.t("settings.energy.levels.summary"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section(lang.t("settings.energy.modules")) {
+                ForEach(EnergyModule.allCases) { module in
+                    energyProfileRow(
+                        title: lang.t(module.titleKey),
+                        description: lang.t(module.descriptionKey(for: profile(for: module))),
+                        selection: profileBinding(for: module)
+                    )
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(lang.t("settings.tab.energy"))
+    }
+
+    private func energyProfileRow(
+        title: String,
+        description: String,
+        selection: Binding<EnergyProfile>
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .lineLimit(1)
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 12)
+
+            Picker(title, selection: selection) {
+                ForEach(EnergyProfile.allCases) { profile in
+                    Text("\(profile.rawValue)").tag(profile)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 124)
+        }
+        .frame(minHeight: 38)
+    }
+
+    private func profile(for module: EnergyModule) -> EnergyProfile {
+        switch module {
+        case .jump:
+            model.jumpTargetPrecisionProfile
+        case .usage:
+            model.usageRefreshProfile
+        case .attach:
+            model.attachmentReconciliationProfile
+        case .codexLog:
+            model.codexRolloutFallbackProfile
+        case .hover:
+            model.overlayHoverProfile
+        }
+    }
+
+    private func profileBinding(for module: EnergyModule) -> Binding<EnergyProfile> {
+        Binding(
+            get: { profile(for: module) },
+            set: { newValue in
+                switch module {
+                case .jump:
+                    model.jumpTargetPrecisionProfile = newValue
+                case .usage:
+                    model.usageRefreshProfile = newValue
+                case .attach:
+                    model.attachmentReconciliationProfile = newValue
+                case .codexLog:
+                    model.codexRolloutFallbackProfile = newValue
+                case .hover:
+                    model.overlayHoverProfile = newValue
+                }
+            }
+        )
     }
 }
 

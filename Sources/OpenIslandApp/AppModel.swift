@@ -32,6 +32,11 @@ final class AppModel {
     private static let codexShelfEnabledDefaultsKey = "feature.codex.shelf.enabled"
     private static let codexRadarEnabledDefaultsKey = "feature.codex.radar.enabled"
     private static let energyProfileDefaultsKey = "app.energyProfile"
+    private static let jumpTargetPrecisionProfileDefaultsKey = "app.energy.jumpTargetPrecisionProfile"
+    private static let usageRefreshProfileDefaultsKey = "app.energy.usageRefreshProfile"
+    private static let attachmentReconciliationProfileDefaultsKey = "app.energy.attachmentReconciliationProfile"
+    private static let codexRolloutFallbackProfileDefaultsKey = "app.energy.codexRolloutFallbackProfile"
+    private static let overlayHoverProfileDefaultsKey = "app.energy.overlayHoverProfile"
 
     static let defaultStatusColors: [SessionPhase: String] = [
         .running: "#6E9FFF",
@@ -41,9 +46,7 @@ final class AppModel {
     ]
     private static let syntheticClaudeSessionPrefix = "claude-process:"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
-    private static let codexRealtimeHealthWindow: TimeInterval = 30
     private static let jumpOverlayDismissLeadTime: Duration = .milliseconds(20)
-    static let hoverOpenDelay: TimeInterval = 0.15
 
     struct AcceptanceStep: Identifiable {
         let id: String
@@ -290,6 +293,10 @@ final class AppModel {
             if showCodexUsage {
                 hooks.refreshCodexUsageState()
             }
+            hooks.configureUsageRefreshMonitoring(
+                profile: usageRefreshProfile,
+                includeCodex: showCodexUsage
+            )
         }
     }
     var completionReplyEnabled: Bool = false {
@@ -345,9 +352,72 @@ final class AppModel {
     }
     var energyProfile: EnergyProfile = .balanced {
         didSet {
-            monitoring.energyProfile = energyProfile
+            guard energyProfile != oldValue else { return }
+            if hasFinishedInit {
+                applyEnergySettings()
+            }
             guard hasFinishedInit, energyProfile != oldValue else { return }
             UserDefaults.standard.set(energyProfile.rawValue, forKey: Self.energyProfileDefaultsKey)
+        }
+    }
+    private var jumpTargetPrecisionProfileOverride: EnergyProfile? {
+        didSet {
+            guard hasFinishedInit, jumpTargetPrecisionProfileOverride != oldValue else { return }
+            persistEnergyProfileOverride(jumpTargetPrecisionProfileOverride, forKey: Self.jumpTargetPrecisionProfileDefaultsKey)
+        }
+    }
+    private var usageRefreshProfileOverride: EnergyProfile? {
+        didSet {
+            guard hasFinishedInit, usageRefreshProfileOverride != oldValue else { return }
+            persistEnergyProfileOverride(usageRefreshProfileOverride, forKey: Self.usageRefreshProfileDefaultsKey)
+        }
+    }
+    private var attachmentReconciliationProfileOverride: EnergyProfile? {
+        didSet {
+            guard hasFinishedInit, attachmentReconciliationProfileOverride != oldValue else { return }
+            persistEnergyProfileOverride(attachmentReconciliationProfileOverride, forKey: Self.attachmentReconciliationProfileDefaultsKey)
+        }
+    }
+    private var codexRolloutFallbackProfileOverride: EnergyProfile? {
+        didSet {
+            guard hasFinishedInit, codexRolloutFallbackProfileOverride != oldValue else { return }
+            persistEnergyProfileOverride(codexRolloutFallbackProfileOverride, forKey: Self.codexRolloutFallbackProfileDefaultsKey)
+        }
+    }
+    private var overlayHoverProfileOverride: EnergyProfile? {
+        didSet {
+            guard hasFinishedInit, overlayHoverProfileOverride != oldValue else { return }
+            persistEnergyProfileOverride(overlayHoverProfileOverride, forKey: Self.overlayHoverProfileDefaultsKey)
+        }
+    }
+    var jumpTargetPrecisionProfile: EnergyProfile {
+        get { effectiveEnergyProfile(for: .jump, override: jumpTargetPrecisionProfileOverride) }
+        set { setEnergyProfileOverride(newValue, for: .jump) }
+    }
+    var usageRefreshProfile: EnergyProfile {
+        get { effectiveEnergyProfile(for: .usage, override: usageRefreshProfileOverride) }
+        set { setEnergyProfileOverride(newValue, for: .usage) }
+    }
+    var attachmentReconciliationProfile: EnergyProfile {
+        get { effectiveEnergyProfile(for: .attach, override: attachmentReconciliationProfileOverride) }
+        set { setEnergyProfileOverride(newValue, for: .attach) }
+    }
+    var codexRolloutFallbackProfile: EnergyProfile {
+        get { effectiveEnergyProfile(for: .codexLog, override: codexRolloutFallbackProfileOverride) }
+        set { setEnergyProfileOverride(newValue, for: .codexLog) }
+    }
+    var overlayHoverProfile: EnergyProfile {
+        get { effectiveEnergyProfile(for: .hover, override: overlayHoverProfileOverride) }
+        set { setEnergyProfileOverride(newValue, for: .hover) }
+    }
+    var hoverOpensIsland: Bool {
+        overlayHoverProfile != .quiet
+    }
+    var hoverOpenDelay: TimeInterval {
+        switch overlayHoverProfile {
+        case .quiet: 0
+        case .balanced: 0.15
+        case .responsive: 0.05
         }
     }
     var launchAtLoginEnabled: Bool = false {
@@ -677,6 +747,21 @@ final class AppModel {
         energyProfile = EnergyProfile(
             rawValue: UserDefaults.standard.integer(forKey: Self.energyProfileDefaultsKey)
         ) ?? .balanced
+        jumpTargetPrecisionProfileOverride = Self.loadEnergyProfileOverride(
+            forKey: Self.jumpTargetPrecisionProfileDefaultsKey
+        )
+        usageRefreshProfileOverride = Self.loadEnergyProfileOverride(
+            forKey: Self.usageRefreshProfileDefaultsKey
+        )
+        attachmentReconciliationProfileOverride = Self.loadEnergyProfileOverride(
+            forKey: Self.attachmentReconciliationProfileDefaultsKey
+        )
+        codexRolloutFallbackProfileOverride = Self.loadEnergyProfileOverride(
+            forKey: Self.codexRolloutFallbackProfileDefaultsKey
+        )
+        overlayHoverProfileOverride = Self.loadEnergyProfileOverride(
+            forKey: Self.overlayHoverProfileDefaultsKey
+        )
         launchAtLoginEnabled = LaunchAtLoginService.shared.isEnabled
         islandAppearanceMode = IslandAppearanceMode(
             rawValue: UserDefaults.standard.string(forKey: Self.islandAppearanceModeDefaultsKey) ?? ""
@@ -758,7 +843,6 @@ final class AppModel {
         }
 
         monitoring.syntheticClaudeSessionPrefix = Self.syntheticClaudeSessionPrefix
-        monitoring.energyProfile = energyProfile
         monitoring.stateAccessor = { [weak self] in self?.state ?? SessionState() }
         monitoring.stateUpdater = { [weak self] in self?.state = $0 }
         monitoring.onSessionsReconciled = { [weak self] in
@@ -781,7 +865,62 @@ final class AppModel {
         }
 
         refreshOverlayDisplayConfiguration()
+        applyEnergySettings()
         hasFinishedInit = true
+    }
+
+    private static func loadEnergyProfileOverride(forKey key: String) -> EnergyProfile? {
+        guard UserDefaults.standard.object(forKey: key) != nil else {
+            return nil
+        }
+        return EnergyProfile(rawValue: UserDefaults.standard.integer(forKey: key))
+    }
+
+    private func persistEnergyProfileOverride(_ profile: EnergyProfile?, forKey key: String) {
+        if let profile {
+            UserDefaults.standard.set(profile.rawValue, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    private func effectiveEnergyProfile(for module: EnergyModule, override: EnergyProfile?) -> EnergyProfile {
+        override ?? module.defaultProfile(for: energyProfile)
+    }
+
+    private func overrideValue(_ profile: EnergyProfile, for module: EnergyModule) -> EnergyProfile? {
+        profile == module.defaultProfile(for: energyProfile) ? nil : profile
+    }
+
+    private func setEnergyProfileOverride(_ profile: EnergyProfile, for module: EnergyModule) {
+        switch module {
+        case .jump:
+            jumpTargetPrecisionProfileOverride = overrideValue(profile, for: module)
+        case .usage:
+            usageRefreshProfileOverride = overrideValue(profile, for: module)
+        case .attach:
+            attachmentReconciliationProfileOverride = overrideValue(profile, for: module)
+        case .codexLog:
+            codexRolloutFallbackProfileOverride = overrideValue(profile, for: module)
+        case .hover:
+            overlayHoverProfileOverride = overrideValue(profile, for: module)
+        }
+
+        if hasFinishedInit {
+            applyEnergySettings()
+        }
+    }
+
+    private func applyEnergySettings() {
+        monitoring.energyProfile = energyProfile
+        monitoring.jumpTargetPrecisionProfile = jumpTargetPrecisionProfile
+        monitoring.attachmentReconciliationProfile = attachmentReconciliationProfile
+        hooks.configureUsageRefreshMonitoring(
+            profile: usageRefreshProfile,
+            includeCodex: showCodexUsage
+        )
+        refreshCodexRolloutTrackingWithRealtimeGate()
+        refreshOverlayPlacementIfVisible()
     }
 
     var sessions: [AgentSession] {
@@ -1345,11 +1484,19 @@ final class AppModel {
     }
 
     func prewarmJumpTargetsForVisibleSessions() {
+        guard jumpTargetPrecisionProfile != .quiet else {
+            return
+        }
+
         let candidates = (surfacedSessions + [focusedSession].compactMap { $0 }).uniquedBySessionID()
         monitoring.prewarmJumpTargets(for: candidates)
     }
 
     private func prewarmJumpTargetsForSelectedSession() {
+        guard jumpTargetPrecisionProfile != .quiet else {
+            return
+        }
+
         guard let selectedSessionID,
               let session = state.session(id: selectedSessionID) else {
             return
@@ -1358,6 +1505,10 @@ final class AppModel {
     }
 
     private func prewarmJumpTargets(for sessionID: String?) {
+        guard jumpTargetPrecisionProfile != .quiet else {
+            return
+        }
+
         guard let sessionID,
               let session = state.session(id: sessionID) else {
             return
@@ -1739,8 +1890,13 @@ final class AppModel {
     }
 
     private func healthyRealtimeCodexSessionIDs(referenceDate: Date) -> Set<String> {
+        guard codexRolloutFallbackProfile != .responsive else {
+            return []
+        }
+
+        let healthWindow = codexRealtimeHealthWindow
         codexRealtimeEventDatesBySessionID = codexRealtimeEventDatesBySessionID.filter { _, lastSeenAt in
-            referenceDate.timeIntervalSince(lastSeenAt) <= Self.codexRealtimeHealthWindow
+            referenceDate.timeIntervalSince(lastSeenAt) <= healthWindow
         }
         return Set(codexRealtimeEventDatesBySessionID.keys)
     }
@@ -1748,8 +1904,13 @@ final class AppModel {
     private func scheduleCodexRolloutFallbackRefreshIfNeeded(referenceDate: Date) {
         codexRolloutFallbackRefreshTask?.cancel()
 
+        guard codexRolloutFallbackProfile != .responsive else {
+            codexRolloutFallbackRefreshTask = nil
+            return
+        }
+
         guard let nextExpiry = codexRealtimeEventDatesBySessionID.values
-            .map({ $0.addingTimeInterval(Self.codexRealtimeHealthWindow) })
+            .map({ $0.addingTimeInterval(codexRealtimeHealthWindow) })
             .min() else {
             codexRolloutFallbackRefreshTask = nil
             return
@@ -1761,6 +1922,14 @@ final class AppModel {
             await MainActor.run { [weak self] in
                 self?.refreshCodexRolloutTrackingWithRealtimeGate()
             }
+        }
+    }
+
+    private var codexRealtimeHealthWindow: TimeInterval {
+        switch codexRolloutFallbackProfile {
+        case .quiet: 120
+        case .balanced: 30
+        case .responsive: 0
         }
     }
 
