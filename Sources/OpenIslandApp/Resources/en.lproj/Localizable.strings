@@ -64,7 +64,6 @@
 "settings.energy.module.usage" = "Usage";
 "settings.energy.module.attach" = "Attach";
 "settings.energy.module.codexLog" = "Codex Log";
-"settings.energy.module.hover" = "Hover";
 "settings.energy.jump.quiet.desc" = "Resolve on click";
 "settings.energy.jump.balanced.desc" = "Prewarm near interaction";
 "settings.energy.jump.responsive.desc" = "Keep targets warmer";
@@ -77,9 +76,6 @@
 "settings.energy.codexLog.quiet.desc" = "Off while live channel is healthy";
 "settings.energy.codexLog.balanced.desc" = "Fallback when live channel is stale";
 "settings.energy.codexLog.responsive.desc" = "Always watch";
-"settings.energy.hover.quiet.desc" = "Click only";
-"settings.energy.hover.balanced.desc" = "Throttled hover tracking";
-"settings.energy.hover.responsive.desc" = "Fast hover open";
 
 /* Settings - Appearance */
 "settings.tab.appearance" = "Appearance";
@@ -94,7 +90,7 @@
 "settings.appearance.style.minimal" = "Minimal";
 "settings.appearance.style.detailed" = "Detailed";
 "settings.appearance.hideIdleToEdge" = "Hide To Edge When Idle";
-"settings.appearance.hideIdleToEdge.help" = "When the island is collapsed without an active notification card, keep only a thin black edge visible. Hovering or clicking still opens it.";
+"settings.appearance.hideIdleToEdge.help" = "When the island is collapsed without an active notification card, keep only a thin black edge visible. Click it to open.";
 "settings.appearance.pixelShape" = "Pixel Glyph";
 "settings.appearance.pixelShape.bars" = "Cat";
 "settings.appearance.pixelShape.steps" = "Steps";

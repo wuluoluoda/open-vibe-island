@@ -356,8 +356,6 @@ struct EnergySettingsPane: View {
             model.attachmentReconciliationProfile
         case .codexLog:
             model.codexRolloutFallbackProfile
-        case .hover:
-            model.overlayHoverProfile
         }
     }
 
@@ -374,8 +372,6 @@ struct EnergySettingsPane: View {
                     model.attachmentReconciliationProfile = newValue
                 case .codexLog:
                     model.codexRolloutFallbackProfile = newValue
-                case .hover:
-                    model.overlayHoverProfile = newValue
                 }
             }
         )

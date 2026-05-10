@@ -367,7 +367,10 @@ struct IslandPanelView: View {
                 isHovering = hovering
             }
             if hovering {
+                model.notePointerInsideIslandSurface()
                 model.prewarmJumpTargetsForVisibleSessions()
+            } else {
+                model.handlePointerExitedIslandSurface()
             }
         }
         .onTapGesture {

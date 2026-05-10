@@ -36,7 +36,6 @@ final class AppModel {
     private static let usageRefreshProfileDefaultsKey = "app.energy.usageRefreshProfile"
     private static let attachmentReconciliationProfileDefaultsKey = "app.energy.attachmentReconciliationProfile"
     private static let codexRolloutFallbackProfileDefaultsKey = "app.energy.codexRolloutFallbackProfile"
-    private static let overlayHoverProfileDefaultsKey = "app.energy.overlayHoverProfile"
 
     static let defaultStatusColors: [SessionPhase: String] = [
         .running: "#6E9FFF",
@@ -384,12 +383,6 @@ final class AppModel {
             persistEnergyProfileOverride(codexRolloutFallbackProfileOverride, forKey: Self.codexRolloutFallbackProfileDefaultsKey)
         }
     }
-    private var overlayHoverProfileOverride: EnergyProfile? {
-        didSet {
-            guard hasFinishedInit, overlayHoverProfileOverride != oldValue else { return }
-            persistEnergyProfileOverride(overlayHoverProfileOverride, forKey: Self.overlayHoverProfileDefaultsKey)
-        }
-    }
     var jumpTargetPrecisionProfile: EnergyProfile {
         get { effectiveEnergyProfile(for: .jump, override: jumpTargetPrecisionProfileOverride) }
         set { setEnergyProfileOverride(newValue, for: .jump) }
@@ -405,20 +398,6 @@ final class AppModel {
     var codexRolloutFallbackProfile: EnergyProfile {
         get { effectiveEnergyProfile(for: .codexLog, override: codexRolloutFallbackProfileOverride) }
         set { setEnergyProfileOverride(newValue, for: .codexLog) }
-    }
-    var overlayHoverProfile: EnergyProfile {
-        get { effectiveEnergyProfile(for: .hover, override: overlayHoverProfileOverride) }
-        set { setEnergyProfileOverride(newValue, for: .hover) }
-    }
-    var hoverOpensIsland: Bool {
-        overlayHoverProfile != .quiet
-    }
-    var hoverOpenDelay: TimeInterval {
-        switch overlayHoverProfile {
-        case .quiet: 0
-        case .balanced: 0.15
-        case .responsive: 0.05
-        }
     }
     var launchAtLoginEnabled: Bool = false {
         didSet {
@@ -759,9 +738,6 @@ final class AppModel {
         codexRolloutFallbackProfileOverride = Self.loadEnergyProfileOverride(
             forKey: Self.codexRolloutFallbackProfileDefaultsKey
         )
-        overlayHoverProfileOverride = Self.loadEnergyProfileOverride(
-            forKey: Self.overlayHoverProfileDefaultsKey
-        )
         launchAtLoginEnabled = LaunchAtLoginService.shared.isEnabled
         islandAppearanceMode = IslandAppearanceMode(
             rawValue: UserDefaults.standard.string(forKey: Self.islandAppearanceModeDefaultsKey) ?? ""
@@ -911,8 +887,6 @@ final class AppModel {
             attachmentReconciliationProfileOverride = overrideValue(profile, for: module)
         case .codexLog:
             codexRolloutFallbackProfileOverride = overrideValue(profile, for: module)
-        case .hover:
-            overlayHoverProfileOverride = overrideValue(profile, for: module)
         }
 
         if hasFinishedInit {

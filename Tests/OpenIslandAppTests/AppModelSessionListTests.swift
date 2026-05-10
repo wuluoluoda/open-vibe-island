@@ -447,26 +447,10 @@ struct AppModelSessionListTests {
     }
 
     @Test
-    func hoverOpenedSessionListAutoCollapsesOnPointerExit() {
-        let model = AppModel()
-        model.notchStatus = .opened
-        model.notchOpenReason = .hover
-        model.islandSurface = .sessionList()
-
-        #expect(model.shouldAutoCollapseOnMouseLeave)
-
-        model.handlePointerExitedIslandSurface()
-
-        #expect(model.notchStatus == .closed)
-        #expect(model.notchOpenReason == nil)
-        #expect(model.islandSurface == .sessionList())
-    }
-
-    @Test
     func closeTransitionSetsStateImmediatelyAndClearsPending() {
         let model = AppModel()
         model.notchStatus = .opened
-        model.notchOpenReason = .hover
+        model.notchOpenReason = .click
         model.islandSurface = .sessionList()
 
         model.notchClose()

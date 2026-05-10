@@ -24,7 +24,6 @@ struct EnergyProfileSettingsTests {
         #expect(EnergyModule.usage.descriptionKey(for: .quiet) == "settings.energy.usage.quiet.desc")
         #expect(EnergyModule.attach.descriptionKey(for: .responsive) == "settings.energy.attach.responsive.desc")
         #expect(EnergyModule.codexLog.descriptionKey(for: .balanced) == "settings.energy.codexLog.balanced.desc")
-        #expect(EnergyModule.hover.descriptionKey(for: .quiet) == "settings.energy.hover.quiet.desc")
     }
 
     @Test

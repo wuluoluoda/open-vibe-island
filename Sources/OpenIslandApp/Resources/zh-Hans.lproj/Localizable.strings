@@ -64,7 +64,6 @@
 "settings.energy.module.usage" = "用量";
 "settings.energy.module.attach" = "终端绑定";
 "settings.energy.module.codexLog" = "Codex 日志";
-"settings.energy.module.hover" = "悬停";
 "settings.energy.jump.quiet.desc" = "点击时解析";
 "settings.energy.jump.balanced.desc" = "交互前预热";
 "settings.energy.jump.responsive.desc" = "更常预热跳转目标";
@@ -77,9 +76,6 @@
 "settings.energy.codexLog.quiet.desc" = "实时通道健康时关闭";
 "settings.energy.codexLog.balanced.desc" = "实时通道过期时回退";
 "settings.energy.codexLog.responsive.desc" = "始终监听";
-"settings.energy.hover.quiet.desc" = "仅点击打开";
-"settings.energy.hover.balanced.desc" = "节流悬停追踪";
-"settings.energy.hover.responsive.desc" = "快速悬停打开";
 
 /* Settings - Appearance */
 "settings.tab.appearance" = "个性化";
@@ -94,7 +90,7 @@
 "settings.appearance.style.minimal" = "简洁";
 "settings.appearance.style.detailed" = "详细";
 "settings.appearance.hideIdleToEdge" = "空闲时隐藏到黑边";
-"settings.appearance.hideIdleToEdge.help" = "当岛处于收起状态且没有活跃通知卡片时，只保留一条细黑边。鼠标悬停或点击仍可展开。";
+"settings.appearance.hideIdleToEdge.help" = "当岛处于收起状态且没有活跃通知卡片时，只保留一条细黑边。点击即可展开。";
 "settings.appearance.pixelShape" = "像素图形";
 "settings.appearance.pixelShape.bars" = "猫咪";
 "settings.appearance.pixelShape.steps" = "阶梯";

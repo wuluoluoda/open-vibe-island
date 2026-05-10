@@ -269,10 +269,6 @@ final class OverlayUICoordinator {
             return false
         }
 
-        if notchOpenReason == .hover && !islandSurface.isNotificationCard {
-            return true
-        }
-
         return notchOpenReason == .notification
             && islandSurface.autoDismissesWhenPresentedAsNotification(session: activeIslandCardSession)
     }

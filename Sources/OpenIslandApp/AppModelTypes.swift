@@ -10,7 +10,6 @@ enum NotchStatus: Equatable {
 
 enum NotchOpenReason: Equatable {
     case click
-    case hover
     case notification
     case boot
 }
@@ -82,7 +81,6 @@ enum EnergyModule: String, CaseIterable, Identifiable, Sendable {
     case usage
     case attach
     case codexLog
-    case hover
 
     var id: String { rawValue }
 
@@ -92,7 +90,6 @@ enum EnergyModule: String, CaseIterable, Identifiable, Sendable {
         case .usage: "settings.energy.module.usage"
         case .attach: "settings.energy.module.attach"
         case .codexLog: "settings.energy.module.codexLog"
-        case .hover: "settings.energy.module.hover"
         }
     }
 
@@ -102,7 +99,7 @@ enum EnergyModule: String, CaseIterable, Identifiable, Sendable {
             globalProfile == .responsive ? .balanced : .quiet
         case .attach:
             globalProfile == .quiet ? .quiet : .balanced
-        case .jump, .codexLog, .hover:
+        case .jump, .codexLog:
             globalProfile
         }
     }
@@ -121,9 +118,6 @@ enum EnergyModule: String, CaseIterable, Identifiable, Sendable {
         case (.codexLog, .quiet): "settings.energy.codexLog.quiet.desc"
         case (.codexLog, .balanced): "settings.energy.codexLog.balanced.desc"
         case (.codexLog, .responsive): "settings.energy.codexLog.responsive.desc"
-        case (.hover, .quiet): "settings.energy.hover.quiet.desc"
-        case (.hover, .balanced): "settings.energy.hover.balanced.desc"
-        case (.hover, .responsive): "settings.energy.hover.responsive.desc"
         }
     }
 }
