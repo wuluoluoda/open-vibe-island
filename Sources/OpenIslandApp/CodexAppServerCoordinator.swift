@@ -143,7 +143,8 @@ final class CodexAppServerCoordinator {
     private func syncCurrentThreads() async {
         guard let client else { return }
         do {
-            let threads = try await currentThreads(from: client)
+            let snapshot = try await currentThreads(from: client)
+            let threads = snapshot.syncableThreads
             var created = 0
             for thread in threads where !thread.ephemeral {
                 // Skip threads already tracked — re-emitting sessionStarted
@@ -156,7 +157,7 @@ final class CodexAppServerCoordinator {
             if created > 0 {
                 onStatusMessage?("Synced \(created) new Codex thread(s) from app-server.")
             }
-            if threads.isEmpty {
+            if snapshot.needsFallbackRefresh {
                 onFallbackRefreshNeeded?()
             }
         } catch {
@@ -166,7 +167,12 @@ final class CodexAppServerCoordinator {
         }
     }
 
-    private func currentThreads(from client: CodexAppServerClient) async throws -> [CodexThread] {
+    private struct CurrentThreadSnapshot {
+        var syncableThreads: [CodexThread]
+        var needsFallbackRefresh: Bool
+    }
+
+    private func currentThreads(from client: CodexAppServerClient) async throws -> CurrentThreadSnapshot {
         var firstError: Error?
         let loadedThreads: [CodexThread]
         do {
@@ -200,12 +206,41 @@ final class CodexAppServerCoordinator {
             threadsByID[thread.id] = thread
         }
 
-        return threadsByID.values.sorted { lhs, rhs in
+        let syncableThreads = threadsByID.values.sorted { lhs, rhs in
             if lhs.status.type == rhs.status.type {
                 return lhs.updatedAt > rhs.updatedAt
             }
 
             return lhs.status.type == .active
+        }
+
+        return CurrentThreadSnapshot(
+            syncableThreads: syncableThreads,
+            needsFallbackRefresh: Self.hasRecentUnsyncedFallbackCandidate(
+                in: allThreads,
+                now: Date(),
+                isSessionTracked: { [isSessionTracked] id in
+                    isSessionTracked?(id) == true
+                }
+            )
+        )
+    }
+
+    nonisolated static func hasRecentUnsyncedFallbackCandidate(
+        in allThreads: [CodexThread],
+        now: Date,
+        maxAge: TimeInterval = 600,
+        isSessionTracked: (String) -> Bool
+    ) -> Bool {
+        let cutoff = now.timeIntervalSince1970 - maxAge
+        return allThreads.contains { thread in
+            guard !thread.ephemeral,
+                  thread.status.type != .active,
+                  !isSessionTracked(thread.id) else {
+                return false
+            }
+
+            return TimeInterval(thread.updatedAt) >= cutoff
         }
     }
 
