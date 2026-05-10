@@ -119,7 +119,6 @@ struct IslandPanelView: View {
     var model: AppModel
 
     @Namespace private var notchNamespace
-    @State private var isHovering = false
     @State private var showingQuitConfirmation = false
 
     private var isOpened: Bool {
@@ -356,16 +355,12 @@ struct IslandPanelView: View {
             }
             .frame(width: surfaceWidth, height: surfaceHeight, alignment: .top)
         }
-        .scaleEffect(usesOpenedVisualState ? 1 : (isHovering ? IslandChromeMetrics.closedHoverScale : 1), anchor: .top)
         .padding(.horizontal, panelShadowHorizontalInset)
         .padding(.bottom, panelShadowBottomInset)
         .animation(notchTransitionAnimation, value: model.notchStatus)
         .animation(.smooth, value: closedPresenceAnimationKey)
         .contentShape(Rectangle())
         .onHover { hovering in
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
-                isHovering = hovering
-            }
             if hovering {
                 model.notePointerInsideIslandSurface()
                 model.prewarmJumpTargetsForVisibleSessions()
