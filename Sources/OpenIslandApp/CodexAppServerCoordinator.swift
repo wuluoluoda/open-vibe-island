@@ -372,12 +372,10 @@ final class CodexAppServerCoordinator {
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.healthCheckInterval)
                 guard !Task.isCancelled else { return }
-                guard self.isConnected, let client = self.client else { continue }
+                guard self.isConnected, self.client != nil else { continue }
 
-                do {
-                    _ = try await self.currentThreads(from: client)
-                } catch {
-                    self.handleConnectionLossIfNeeded(reason: "Lost Codex app-server connection. Reconnecting…")
+                await self.syncCurrentThreads()
+                if !self.isConnected {
                     return
                 }
             }
