@@ -415,7 +415,7 @@ struct CodexSessionTrackingTests {
         }
 
         let recorder = EventRecorder()
-        let watcher = CodexRolloutWatcher(pollInterval: 0.05)
+        let watcher = CodexRolloutWatcher(pollInterval: 0.05, maximumPollInterval: 0.05)
         watcher.eventHandler = { event in
             Task {
                 await recorder.append(event)
@@ -588,6 +588,7 @@ struct CodexSessionTrackingTests {
         let recorder = EventRecorder()
         let watcher = CodexRolloutWatcher(
             pollInterval: 0.05,
+            maximumPollInterval: 0.05,
             initialReadLimit: 512,
             initialPromptBootstrapLimit: 4_096
         )
@@ -653,7 +654,11 @@ struct CodexSessionTrackingTests {
             .write(to: rolloutURL, atomically: true, encoding: .utf8)
 
         let recorder = EventRecorder()
-        let watcher = CodexRolloutWatcher(pollInterval: 0.05, initialReadLimit: 160)
+        let watcher = CodexRolloutWatcher(
+            pollInterval: 0.05,
+            maximumPollInterval: 0.05,
+            initialReadLimit: 160
+        )
         watcher.eventHandler = { event in
             Task {
                 await recorder.append(event)

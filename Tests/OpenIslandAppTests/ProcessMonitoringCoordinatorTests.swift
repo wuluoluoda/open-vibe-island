@@ -9,7 +9,7 @@ struct ProcessMonitoringCoordinatorTests {
         #expect(ProcessMonitoringCoordinator.monitorSleepDuration(
             for: [],
             isResolvingInitialLiveSessions: true
-        ) == .seconds(2))
+        ) == .seconds(3))
     }
 
     @Test
@@ -17,7 +17,7 @@ struct ProcessMonitoringCoordinatorTests {
         #expect(ProcessMonitoringCoordinator.monitorSleepDuration(
             for: [],
             isResolvingInitialLiveSessions: false
-        ) == .seconds(8))
+        ) == .seconds(30))
     }
 
     @Test
@@ -34,7 +34,7 @@ struct ProcessMonitoringCoordinatorTests {
                 ),
             ],
             isResolvingInitialLiveSessions: false
-        ) == .seconds(2))
+        ) == .seconds(3))
     }
 
     @Test
@@ -51,7 +51,7 @@ struct ProcessMonitoringCoordinatorTests {
                 ),
             ],
             isResolvingInitialLiveSessions: false
-        ) == .seconds(5))
+        ) == .seconds(15))
     }
 
     @Test
@@ -60,7 +60,7 @@ struct ProcessMonitoringCoordinatorTests {
             for: [],
             isResolvingInitialLiveSessions: false,
             energyProfile: .quiet
-        ) == .seconds(12))
+        ) == .seconds(60))
 
         #expect(ProcessMonitoringCoordinator.monitorSleepDuration(
             for: [runningSession()],
@@ -72,7 +72,7 @@ struct ProcessMonitoringCoordinatorTests {
             for: [completedSession()],
             isResolvingInitialLiveSessions: false,
             energyProfile: .quiet
-        ) == .seconds(8))
+        ) == .seconds(30))
     }
 
     @Test
@@ -107,7 +107,7 @@ struct ProcessMonitoringCoordinatorTests {
             existingLiveSessions: [runningSession()],
             activeProcesses: [],
             isResolvingInitialLiveSessions: false,
-            lastTerminalSnapshotProbeDate: now.addingTimeInterval(-59),
+            lastTerminalSnapshotProbeDate: now.addingTimeInterval(-119),
             now: now,
             energyProfile: .balanced
         ))
@@ -116,14 +116,14 @@ struct ProcessMonitoringCoordinatorTests {
             existingLiveSessions: [runningSession()],
             activeProcesses: [],
             isResolvingInitialLiveSessions: false,
-            lastTerminalSnapshotProbeDate: now.addingTimeInterval(-60),
+            lastTerminalSnapshotProbeDate: now.addingTimeInterval(-120),
             now: now,
             energyProfile: .balanced
         ))
 
         #expect(ProcessMonitoringCoordinator.terminalSnapshotReconciliationInterval(
             energyProfile: .quiet
-        ) == 120)
+        ) == 300)
     }
 
     @Test

@@ -37,25 +37,25 @@ enum EnergyProfile: Int, CaseIterable, Identifiable, Sendable {
 
     var activeMonitorCadence: Duration {
         switch self {
-        case .quiet: .seconds(3)
-        case .balanced: .seconds(2)
+        case .quiet: .seconds(5)
+        case .balanced: .seconds(3)
         case .responsive: .seconds(1)
         }
     }
 
     var quietMonitorCadence: Duration {
         switch self {
-        case .quiet: .seconds(8)
-        case .balanced: .seconds(5)
-        case .responsive: .seconds(3)
+        case .quiet: .seconds(30)
+        case .balanced: .seconds(15)
+        case .responsive: .seconds(8)
         }
     }
 
     var idleMonitorCadence: Duration {
         switch self {
-        case .quiet: .seconds(12)
-        case .balanced: .seconds(8)
-        case .responsive: .seconds(5)
+        case .quiet: .seconds(60)
+        case .balanced: .seconds(30)
+        case .responsive: .seconds(15)
         }
     }
 
