@@ -37,8 +37,7 @@ Open Island 基于 [Octane0411/open-vibe-island](https://github.com/Octane0411/o
 
 ### 这个项目的改进
 
-- **Codex Desktop App 雷达面板** — 更密集地展示实时 thread/turn 状态、重连中的会话、中断任务和循环提示。
-- **Codex artifact shelf** — 为 Codex 产出的文件和路径增加专门的 shelf，并支持从 island UI 快速操作文件。
+- **Codex Desktop App 雷达面板** — 更密集地展示实时 thread/turn 状态、重连中的会话和中断任务。
 - **更稳定的 Codex 会话追踪** — 优化行排序、瞬时重连、陈旧 interrupted 状态、已完成会话过期和会话标签。
 - **覆盖层交互修复** — 调整 hover 恢复、定向展开 shelf 和面板高度，适合更长时间的 Codex 会话。
 - **可审查的本地工作流** — 增加 build checkpoint tag、项目工作流说明和更完整的测试，方便打包与回滚。

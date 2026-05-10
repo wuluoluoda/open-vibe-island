@@ -1270,6 +1270,39 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func codexExperimentalSettingsIgnorePersistedLegacyPreferences() {
+        let defaults = UserDefaults.standard
+        let keys = [
+            "feature.codex.shelf.enabled",
+            "feature.codex.loopSuspected.enabled",
+            "feature.codex.stalledThresholdMinutes",
+            "feature.codex.loopSuspected.threshold",
+        ]
+        let previousValues = keys.map { ($0, defaults.object(forKey: $0)) }
+        defer {
+            for (key, value) in previousValues {
+                if let value {
+                    defaults.set(value, forKey: key)
+                } else {
+                    defaults.removeObject(forKey: key)
+                }
+            }
+        }
+
+        defaults.set(true, forKey: "feature.codex.shelf.enabled")
+        defaults.set(true, forKey: "feature.codex.loopSuspected.enabled")
+        defaults.set(6, forKey: "feature.codex.stalledThresholdMinutes")
+        defaults.set(8, forKey: "feature.codex.loopSuspected.threshold")
+
+        let model = AppModel()
+
+        #expect(!model.codexShelfEnabled)
+        #expect(!model.codexLoopSuspectedEnabled)
+        #expect(model.codexStalledThresholdMinutes == 12)
+        #expect(model.codexLoopSuspectedThreshold == 4)
+    }
+
+    @Test
     func codexShelfCanBeDisabledViaFeatureToggle() throws {
         let now = Date(timeIntervalSince1970: 3_975)
         let model = AppModel(codexShelfEnabledOverride: true)

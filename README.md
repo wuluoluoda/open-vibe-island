@@ -37,8 +37,7 @@ Open Island is based on [Octane0411/open-vibe-island](https://github.com/Octane0
 
 ### What This Project Adds
 
-- **Codex Desktop App radar** — a denser operational panel for live thread/turn state, reconnecting sessions, interrupted work, and loop hints.
-- **Codex artifact shelf** — a dedicated shelf for Codex-produced files and paths, with quick file actions from the island UI.
+- **Codex Desktop App radar** — a denser operational panel for live thread/turn state, reconnecting sessions, and interrupted work.
 - **More stable Codex session tracking** — row ordering, transient reconnects, stale interrupted states, completed-session expiry, and session labels have been tightened.
 - **Overlay behavior fixes** — hover recovery, directional shelf expansion, and panel height handling are tuned for long Codex sessions.
 - **Reviewable local workflow** — build checkpoint tags, project workflow notes, and broader tests document how this project is packaged and rolled back.

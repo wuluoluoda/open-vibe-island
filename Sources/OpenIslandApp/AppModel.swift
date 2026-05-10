@@ -26,10 +26,6 @@ final class AppModel {
     private static let showCodexUsageDefaultsKey = "app.showCodexUsage"
     private static let completionReplyEnabledDefaultsKey = "feature.completionReply.enabled"
     private static let suppressFrontmostNotificationsDefaultsKey = "app.suppressFrontmostNotifications"
-    private static let codexStalledThresholdMinutesDefaultsKey = "feature.codex.stalledThresholdMinutes"
-    private static let codexLoopSuspectedEnabledDefaultsKey = "feature.codex.loopSuspected.enabled"
-    private static let codexLoopSuspectedThresholdDefaultsKey = "feature.codex.loopSuspected.threshold"
-    private static let codexShelfEnabledDefaultsKey = "feature.codex.shelf.enabled"
     private static let codexRadarEnabledDefaultsKey = "feature.codex.radar.enabled"
     private static let energyProfileDefaultsKey = "app.energyProfile"
     private static let jumpTargetPrecisionProfileDefaultsKey = "app.energy.jumpTargetPrecisionProfile"
@@ -311,28 +307,12 @@ final class AppModel {
             UserDefaults.standard.set(suppressFrontmostNotifications, forKey: Self.suppressFrontmostNotificationsDefaultsKey)
         }
     }
-    var codexStalledThresholdMinutes: Int = 12 {
-        didSet {
-            guard hasFinishedInit, codexStalledThresholdMinutes != oldValue else { return }
-            UserDefaults.standard.set(max(3, codexStalledThresholdMinutes), forKey: Self.codexStalledThresholdMinutesDefaultsKey)
-        }
-    }
-    var codexLoopSuspectedEnabled: Bool = false {
-        didSet {
-            guard hasFinishedInit, codexLoopSuspectedEnabled != oldValue else { return }
-            UserDefaults.standard.set(codexLoopSuspectedEnabled, forKey: Self.codexLoopSuspectedEnabledDefaultsKey)
-        }
-    }
-    var codexLoopSuspectedThreshold: Int = 4 {
-        didSet {
-            guard hasFinishedInit, codexLoopSuspectedThreshold != oldValue else { return }
-            UserDefaults.standard.set(max(3, codexLoopSuspectedThreshold), forKey: Self.codexLoopSuspectedThresholdDefaultsKey)
-        }
-    }
-    var codexShelfEnabled: Bool = true {
+    var codexStalledThresholdMinutes: Int = 12
+    var codexLoopSuspectedEnabled: Bool = false
+    var codexLoopSuspectedThreshold: Int = 4
+    var codexShelfEnabled: Bool = false {
         didSet {
             guard hasFinishedInit, codexShelfEnabled != oldValue else { return }
-            UserDefaults.standard.set(codexShelfEnabled, forKey: Self.codexShelfEnabledDefaultsKey)
             refreshOverlayPlacementIfVisible()
         }
     }
@@ -691,10 +671,6 @@ final class AppModel {
             Self.hapticFeedbackEnabledDefaultsKey: false,
             Self.completionReplyEnabledDefaultsKey: false,
             Self.suppressFrontmostNotificationsDefaultsKey: true,
-            Self.codexStalledThresholdMinutesDefaultsKey: 12,
-            Self.codexLoopSuspectedEnabledDefaultsKey: false,
-            Self.codexLoopSuspectedThresholdDefaultsKey: 4,
-            Self.codexShelfEnabledDefaultsKey: false,
             Self.codexRadarEnabledDefaultsKey: true,
             Self.energyProfileDefaultsKey: EnergyProfile.balanced.rawValue,
         ])
@@ -711,17 +687,10 @@ final class AppModel {
             )
         }
         completionReplyEnabled = UserDefaults.standard.bool(forKey: Self.completionReplyEnabledDefaultsKey)
-        codexStalledThresholdMinutes = max(
-            3,
-            UserDefaults.standard.integer(forKey: Self.codexStalledThresholdMinutesDefaultsKey)
-        )
-        codexLoopSuspectedEnabled = UserDefaults.standard.bool(forKey: Self.codexLoopSuspectedEnabledDefaultsKey)
-        codexLoopSuspectedThreshold = max(
-            3,
-            UserDefaults.standard.integer(forKey: Self.codexLoopSuspectedThresholdDefaultsKey)
-        )
-        codexShelfEnabled = codexShelfEnabledOverride
-            ?? UserDefaults.standard.bool(forKey: Self.codexShelfEnabledDefaultsKey)
+        codexStalledThresholdMinutes = 12
+        codexLoopSuspectedEnabled = false
+        codexLoopSuspectedThreshold = 4
+        codexShelfEnabled = codexShelfEnabledOverride ?? false
         codexRadarEnabled = UserDefaults.standard.bool(forKey: Self.codexRadarEnabledDefaultsKey)
         energyProfile = EnergyProfile(
             rawValue: UserDefaults.standard.integer(forKey: Self.energyProfileDefaultsKey)

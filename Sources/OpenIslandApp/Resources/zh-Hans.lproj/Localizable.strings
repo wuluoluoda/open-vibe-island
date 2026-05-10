@@ -44,15 +44,6 @@
 "settings.general.languageEnglish" = "English";
 "settings.general.languageChinese" = "简体中文";
 "settings.general.languageTraditionalChinese" = "繁體中文";
-"settings.general.codexIsland" = "Codex 岛配置";
-"settings.general.codexRadarView" = "启用项目雷达面板";
-"settings.general.codexShelf" = "启用产物 Shelf（Beta）";
-"settings.general.codexLoopSuspected" = "启用循环疑似提示";
-"settings.general.codexStalledThreshold" = "卡住判定阈值";
-"settings.general.codexLoopThreshold" = "循环重复阈值";
-"settings.general.codexIslandHint" = "产物 Shelf 仍是 Beta 功能。Stalled 和 Loop 仅作为保守提示。如果干扰较大，可在此关闭实验信号。";
-"settings.general.minutes" = "%lld 分钟";
-"settings.general.attempts" = "%lld 次";
 "settings.energy.section" = "能耗";
 "settings.energy.mode" = "模式";
 "settings.energy.modules" = "模块";
