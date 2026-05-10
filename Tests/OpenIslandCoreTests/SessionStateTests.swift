@@ -932,11 +932,28 @@ struct SessionStateTests {
         #expect(enabled.changed)
         #expect(enabled.featureEnabledByInstaller)
         #expect(enabled.contents.contains("[features]"))
-        #expect(enabled.contents.contains("codex_hooks = true"))
+        #expect(enabled.contents.contains("hooks = true"))
+        #expect(!enabled.contents.contains("codex_hooks = true"))
 
         let removed = CodexHookInstaller.disableCodexHooksFeatureIfManaged(in: enabled.contents)
         #expect(removed.changed)
-        #expect(!removed.contents.contains("codex_hooks = true"))
+        #expect(!removed.contents.contains("hooks = true"))
+    }
+
+    @Test
+    func codexHookInstallerMigratesLegacyFeatureFlag() {
+        let legacyConfig = """
+        [features]
+        goals = true
+        codex_hooks = true
+        """
+
+        let enabled = CodexHookInstaller.enableCodexHooksFeature(in: legacyConfig)
+        #expect(enabled.changed)
+        #expect(!enabled.featureEnabledByInstaller)
+        #expect(enabled.contents.contains("hooks = true"))
+        #expect(!enabled.contents.contains("codex_hooks = true"))
+        #expect(CodexHookInstaller.isCodexHooksFeatureEnabled(in: enabled.contents))
     }
 
     @Test

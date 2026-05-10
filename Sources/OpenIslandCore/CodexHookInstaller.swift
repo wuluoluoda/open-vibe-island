@@ -141,31 +141,38 @@ public enum CodexHookInstaller {
     public static func enableCodexHooksFeature(in contents: String) -> CodexFeatureMutation {
         var lines = contents.components(separatedBy: "\n")
 
-        if let codexHookIndex = lineIndex(ofKey: "codex_hooks", inSection: "features", lines: lines) {
-            let trimmed = lines[codexHookIndex].trimmingCharacters(in: .whitespaces)
-            if trimmed == "codex_hooks = true" {
+        let hadEnabledFeature = isCodexHooksFeatureEnabled(in: contents)
+        var removedLegacyFlag = false
+        if let legacyHookIndex = lineIndex(ofKey: "codex_hooks", inSection: "features", lines: lines) {
+            lines.remove(at: legacyHookIndex)
+            removedLegacyFlag = true
+        }
+
+        if let hookIndex = lineIndex(ofKey: "hooks", inSection: "features", lines: lines) {
+            let trimmed = lines[hookIndex].trimmingCharacters(in: .whitespaces)
+            if trimmed == "hooks = true" {
                 return CodexFeatureMutation(
-                    contents: contents,
-                    changed: false,
+                    contents: lines.joined(separator: "\n"),
+                    changed: removedLegacyFlag,
                     featureEnabledByInstaller: false
                 )
             }
 
-            lines[codexHookIndex] = "codex_hooks = true"
+            lines[hookIndex] = "hooks = true"
             return CodexFeatureMutation(
                 contents: lines.joined(separator: "\n"),
                 changed: true,
-                featureEnabledByInstaller: true
+                featureEnabledByInstaller: !hadEnabledFeature
             )
         }
 
         if let featuresRange = sectionRange(named: "features", lines: lines) {
             let insertIndex = featuresRange.upperBound
-            lines.insert("codex_hooks = true", at: insertIndex)
+            lines.insert("hooks = true", at: insertIndex)
             return CodexFeatureMutation(
                 contents: lines.joined(separator: "\n"),
                 changed: true,
-                featureEnabledByInstaller: true
+                featureEnabledByInstaller: !hadEnabledFeature
             )
         }
 
@@ -173,7 +180,7 @@ public enum CodexHookInstaller {
             lines.append("")
         }
         lines.append("[features]")
-        lines.append("codex_hooks = true")
+        lines.append("hooks = true")
 
         return CodexFeatureMutation(
             contents: lines.joined(separator: "\n"),
@@ -184,12 +191,21 @@ public enum CodexHookInstaller {
 
     public static func disableCodexHooksFeatureIfManaged(in contents: String) -> CodexFeatureMutation {
         var lines = contents.components(separatedBy: "\n")
-        guard let featuresRange = sectionRange(named: "features", lines: lines),
-              let codexHookIndex = lineIndex(ofKey: "codex_hooks", inSection: "features", lines: lines) else {
+        guard let featuresRange = sectionRange(named: "features", lines: lines) else {
             return CodexFeatureMutation(contents: contents, changed: false, featureEnabledByInstaller: false)
         }
 
-        lines.remove(at: codexHookIndex)
+        var removedFeature = false
+        for key in ["hooks", "codex_hooks"] {
+            if let index = lineIndex(ofKey: key, inSection: "features", lines: lines) {
+                lines.remove(at: index)
+                removedFeature = true
+            }
+        }
+
+        guard removedFeature else {
+            return CodexFeatureMutation(contents: contents, changed: false, featureEnabledByInstaller: false)
+        }
 
         let updatedRange = sectionRange(named: "features", lines: lines) ?? featuresRange
         let remainingFeatureLines = lines[updatedRange.lowerBound + 1..<updatedRange.upperBound]
@@ -208,6 +224,16 @@ public enum CodexHookInstaller {
             changed: true,
             featureEnabledByInstaller: false
         )
+    }
+
+    public static func isCodexHooksFeatureEnabled(in contents: String) -> Bool {
+        let lines = contents.components(separatedBy: "\n")
+        return ["hooks", "codex_hooks"].contains { key in
+            guard let index = lineIndex(ofKey: key, inSection: "features", lines: lines) else {
+                return false
+            }
+            return lines[index].trimmingCharacters(in: .whitespaces) == "\(key) = true"
+        }
     }
 
     private static func loadRootObject(from data: Data?) throws -> [String: Any] {

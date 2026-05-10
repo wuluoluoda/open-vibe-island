@@ -67,7 +67,7 @@ public final class CodexHookInstallationManager: @unchecked Sendable {
             hooksURL: hooksURL,
             manifestURL: manifestURL,
             hooksBinaryURL: resolvedHooksBinaryURL,
-            featureFlagEnabled: configContents.contains("codex_hooks = true"),
+            featureFlagEnabled: CodexHookInstaller.isCodexHooksFeatureEnabled(in: configContents),
             managedHooksPresent: managedHooksPresent,
             manifest: manifest
         )

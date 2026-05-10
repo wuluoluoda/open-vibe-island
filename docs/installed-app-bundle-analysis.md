@@ -268,7 +268,7 @@ But the installed main binary contains these symbols / strings:
 
 Also observed locally:
 
-- `~/.codex/config.toml` has `[features] codex_hooks = true`
+- `~/.codex/config.toml` has `[features] hooks = true`
 - `~/.codex/.tmp/app-server-remote-plugin-sync-v1` exists
 
 Inference:

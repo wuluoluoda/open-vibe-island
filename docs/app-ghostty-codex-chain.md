@@ -195,7 +195,7 @@ We also checked for active app-server evidence and did not see it:
 - `vibe-island` has no child process resembling `codex app-server`
 - `ps` showed no running Codex process with `app-server` arguments
 - `lsof -a -p <vibe-island-pid> -iTCP -iUDP` only showed the app's proxy connection to `127.0.0.1:7897`, not a Codex localhost port
-- `~/.codex/config.toml` enables `codex_hooks = true` but does not enable any app-server-specific setting
+- `~/.codex/config.toml` enables `[features].hooks = true` for Codex hooks but does not enable any app-server-specific setting
 - `~/.codex/session_index.jsonl` is stale on this machine and only contains two old March sessions, so it cannot explain the app's live April session tracking
 
 The Codex CLI definitely supports an `app-server` subcommand, and the Vibe Island binary contains strings such as:
