@@ -919,23 +919,35 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
         var shouldTrimLeadingPartialLine = false
     }
 
+    private struct RefreshResult {
+        var events: [AgentEvent] = []
+        var didReadData = false
+
+        static let empty = RefreshResult()
+    }
+
     public var eventHandler: (@Sendable (AgentEvent) -> Void)?
 
     private let pollInterval: TimeInterval
+    private let maximumPollInterval: TimeInterval
     private let initialReadLimit: UInt64
     private let initialPromptBootstrapLimit: UInt64
     private let queue = DispatchQueue(label: "app.openisland.codex.rollout-watcher")
     private var timer: DispatchSourceTimer?
+    private var currentPollInterval: TimeInterval
     private var observations: [String: Observation] = [:]
 
     public init(
         pollInterval: TimeInterval = 3.0,
+        maximumPollInterval: TimeInterval = 30.0,
         initialReadLimit: UInt64 = 128 * 1_024,
         initialPromptBootstrapLimit: UInt64 = 4 * 1_024 * 1_024
     ) {
         self.pollInterval = pollInterval
+        self.maximumPollInterval = max(pollInterval, maximumPollInterval)
         self.initialReadLimit = initialReadLimit
         self.initialPromptBootstrapLimit = initialPromptBootstrapLimit
+        self.currentPollInterval = pollInterval
     }
 
     deinit {
@@ -952,67 +964,106 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
         queue.sync {
             timer?.cancel()
             timer = nil
+            currentPollInterval = pollInterval
             observations.removeAll()
         }
     }
 
     private func syncLocked(targets: [CodexRolloutWatchTarget]) {
         let targetMap = Dictionary(uniqueKeysWithValues: targets.map { ($0.sessionID, $0) })
+        var didChangeTargets = false
 
         observations = observations.reduce(into: [:]) { partialResult, pair in
             guard let updatedTarget = targetMap[pair.key] else {
+                didChangeTargets = true
                 return
             }
 
             if pair.value.target == updatedTarget {
                 partialResult[pair.key] = pair.value
             } else {
+                didChangeTargets = true
                 partialResult[pair.key] = makeObservation(for: updatedTarget)
             }
         }
 
         for target in targets where observations[target.sessionID] == nil {
+            didChangeTargets = true
             observations[target.sessionID] = makeObservation(for: target)
         }
 
         if observations.isEmpty {
             timer?.cancel()
             timer = nil
+            currentPollInterval = pollInterval
             return
         }
 
-        if timer == nil {
-            let timer = DispatchSource.makeTimerSource(queue: queue)
-            timer.schedule(deadline: .now() + pollInterval, repeating: pollInterval)
-            timer.setEventHandler { [weak self] in
-                self?.pollLocked()
-            }
-            self.timer = timer
-            timer.resume()
+        if didChangeTargets {
+            currentPollInterval = pollInterval
         }
 
+        ensureTimerLocked()
         pollLocked()
     }
 
     private func pollLocked() {
         let sessionIDs = Array(observations.keys)
+        var didObserveActivity = false
 
         for sessionID in sessionIDs {
             guard var observation = observations[sessionID] else {
                 continue
             }
 
-            let events = refresh(observation: &observation)
+            let result = refresh(observation: &observation)
             observations[sessionID] = observation
-            events.forEach { eventHandler?($0) }
+            didObserveActivity = didObserveActivity || result.didReadData || !result.events.isEmpty
+            result.events.forEach { eventHandler?($0) }
         }
+
+        let nextDelay = didObserveActivity ? pollInterval : currentPollInterval
+        currentPollInterval = didObserveActivity
+            ? pollInterval
+            : min(maximumPollInterval, currentPollInterval * 2)
+        scheduleNextPollLocked(after: nextDelay)
     }
 
-    private func refresh(observation: inout Observation) -> [AgentEvent] {
+    private func ensureTimerLocked() {
+        guard timer == nil else {
+            return
+        }
+
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + currentPollInterval)
+        timer.setEventHandler { [weak self] in
+            self?.pollLocked()
+        }
+        self.timer = timer
+        timer.resume()
+    }
+
+    private func scheduleNextPollLocked(after interval: TimeInterval) {
+        guard !observations.isEmpty, let timer else {
+            return
+        }
+
+        timer.schedule(
+            deadline: .now() + interval,
+            leeway: Self.timerLeeway(for: interval)
+        )
+    }
+
+    private static func timerLeeway(for interval: TimeInterval) -> DispatchTimeInterval {
+        let leeway = min(1.0, max(0.01, interval * 0.1))
+        return .milliseconds(Int(leeway * 1_000))
+    }
+
+    private func refresh(observation: inout Observation) -> RefreshResult {
         let fileURL = URL(fileURLWithPath: observation.target.transcriptPath)
         guard FileManager.default.fileExists(atPath: fileURL.path),
               let fileHandle = try? FileHandle(forReadingFrom: fileURL) else {
-            return []
+            return .empty
         }
 
         defer {
@@ -1030,7 +1081,7 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
             try fileHandle.seek(toOffset: observation.offset)
             let data = try fileHandle.readToEnd() ?? Data()
             guard !data.isEmpty else {
-                return []
+                return .empty
             }
 
             observation.offset += UInt64(data.count)
@@ -1043,20 +1094,23 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
 
             let lines = completeLines(from: &observation.pendingBuffer)
             guard !lines.isEmpty else {
-                return []
+                return RefreshResult(events: [], didReadData: true)
             }
 
             let oldSnapshot = observation.snapshot
             lines.forEach { CodexRolloutReducer.apply(line: $0, to: &observation.snapshot) }
 
-            return CodexRolloutReducer.events(
-                from: oldSnapshot,
-                to: observation.snapshot,
-                sessionID: observation.target.sessionID,
-                transcriptPath: observation.target.transcriptPath
+            return RefreshResult(
+                events: CodexRolloutReducer.events(
+                    from: oldSnapshot,
+                    to: observation.snapshot,
+                    sessionID: observation.target.sessionID,
+                    transcriptPath: observation.target.transcriptPath
+                ),
+                didReadData: true
             )
         } catch {
-            return []
+            return .empty
         }
     }
 

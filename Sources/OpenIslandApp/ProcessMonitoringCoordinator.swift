@@ -190,9 +190,9 @@ final class ProcessMonitoringCoordinator {
         energyProfile: EnergyProfile = .balanced
     ) -> TimeInterval {
         switch energyProfile {
-        case .quiet: 120
-        case .balanced: 60
-        case .responsive: 30
+        case .quiet: 300
+        case .balanced: 120
+        case .responsive: 60
         }
     }
 
