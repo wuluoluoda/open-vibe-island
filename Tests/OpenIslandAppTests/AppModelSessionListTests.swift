@@ -698,6 +698,52 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func completionNotificationPresentsEvenWhenSessionListIsOpen() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        var playedSoundCount = 0
+        let model = AppModel(
+            isNotificationSessionAlreadyFrontmost: { _ in true }
+        )
+        model.overlay.notificationSoundPlayer = { _ in
+            playedSoundCount += 1
+        }
+        model.notchStatus = .opened
+        model.notchOpenReason = .click
+        model.islandSurface = .sessionList()
+        model.state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "open-list-completed-session",
+                    title: "Codex · open-island",
+                    tool: .codex,
+                    origin: .live,
+                    attachmentState: .attached,
+                    phase: .running,
+                    summary: "Working.",
+                    updatedAt: now
+                ),
+            ]
+        )
+
+        model.applyTrackedEvent(
+            .sessionCompleted(
+                SessionCompleted(
+                    sessionID: "open-list-completed-session",
+                    summary: "Turn completed.",
+                    timestamp: now.addingTimeInterval(1)
+                )
+            ),
+            updateLastActionMessage: false,
+            ingress: .bridge
+        )
+
+        #expect(model.notchStatus == .opened)
+        #expect(model.notchOpenReason == .notification)
+        #expect(model.islandSurface == .sessionList(actionableSessionID: "open-list-completed-session"))
+        #expect(playedSoundCount == 1)
+    }
+
+    @Test
     func closeTransitionSetsStateImmediatelyAndClearsPending() {
         let model = AppModel()
         model.notchStatus = .opened

@@ -1929,13 +1929,22 @@ final class AppModel {
         ingress: TrackedEventIngress
     ) {
         guard !wasAlreadyCompleted,
-              notificationSurfaceIsEligibleForPresentation(surface, ingress: ingress),
               let sessionID = surface.sessionID,
-              let session = state.session(id: sessionID) else {
+              let session = state.session(id: sessionID),
+              notificationSurfaceMatchesCurrentState(surface, session: session, ingress: ingress) else {
             return
         }
 
         playNotificationSound()
+
+        if session.phase == .completed {
+            presentNotificationSurface(surface, playSound: false)
+            return
+        }
+
+        guard notificationSurfaceCanOpenOverCurrentIslandState() else {
+            return
+        }
 
         guard suppressFrontmostNotifications,
               session.phase != .completed else {
@@ -1960,6 +1969,19 @@ final class AppModel {
         }
     }
 
+    private func notificationSurfaceMatchesCurrentState(
+        _ surface: IslandSurface,
+        session: AgentSession,
+        ingress: TrackedEventIngress
+    ) -> Bool {
+        (ingress == .bridge || !isResolvingInitialLiveSessions)
+            && surface.matchesCurrentState(of: session)
+    }
+
+    private func notificationSurfaceCanOpenOverCurrentIslandState() -> Bool {
+        notchStatus == .closed || notchOpenReason == .notification
+    }
+
     private func notificationSurfaceIsEligibleForPresentation(
         _ surface: IslandSurface,
         ingress: TrackedEventIngress
@@ -1969,9 +1991,8 @@ final class AppModel {
             return false
         }
 
-        return (ingress == .bridge || !isResolvingInitialLiveSessions)
-            && (notchStatus == .closed || notchOpenReason == .notification)
-            && surface.matchesCurrentState(of: session)
+        return notificationSurfaceMatchesCurrentState(surface, session: session, ingress: ingress)
+            && notificationSurfaceCanOpenOverCurrentIslandState()
     }
 
     private func radarProjectName(for session: AgentSession) -> String {
