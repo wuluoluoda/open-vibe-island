@@ -487,6 +487,11 @@ final class SessionDiscoveryCoordinator {
         }
 
         for event in rediscoveredEvents {
+            if case let .sessionCompleted(payload) = event {
+                NotificationDebugLog.write(
+                    "rediscovery emitted completion sessionID=\(payload.sessionID) interrupt=\(payload.isInterrupt == true)"
+                )
+            }
             onRediscoveredEvent?(event)
         }
     }

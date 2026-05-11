@@ -315,14 +315,19 @@ final class OverlayUICoordinator {
     // MARK: - Notification surfaces
 
     func playNotificationSound() {
+        NotificationDebugLog.write("overlay sound request muted=\(isSoundMuted)")
         notificationSoundPlayer(isSoundMuted)
     }
 
     func presentNotificationSurface(_ surface: IslandSurface, playSound: Bool = true) {
         guard surface.isNotificationCard else {
+            NotificationDebugLog.write("overlay present skipped nonNotificationSurface=\(surface)")
             return
         }
 
+        NotificationDebugLog.write(
+            "overlay present surface=\(surface) playSound=\(playSound) statusBefore=\(notchStatus) reasonBefore=\(String(describing: notchOpenReason))"
+        )
         if playSound {
             playNotificationSound()
         }

@@ -33,16 +33,21 @@ struct NotificationSoundService {
     /// Plays a system sound by name.
     static func play(_ name: String) {
         guard let sound = NSSound(named: NSSound.Name(name)) else {
+            NotificationDebugLog.write("sound missing name=\(name)")
             return
         }
         activeSound = sound
         sound.stop()
+        NotificationDebugLog.write("sound play name=\(name)")
         sound.play()
     }
 
     /// Plays the user-selected notification sound, respecting the mute setting.
     static func playNotification(isMuted: Bool) {
-        guard !isMuted else { return }
+        guard !isMuted else {
+            NotificationDebugLog.write("sound skipped muted=true")
+            return
+        }
         play(selectedSoundName)
     }
 }
