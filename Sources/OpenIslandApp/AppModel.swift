@@ -792,6 +792,9 @@ final class AppModel {
         codexAppServer.isSessionTracked = { [weak self] id in
             self?.state.session(id: id) != nil
         }
+        codexAppServer.trackedSessionPhase = { [weak self] id in
+            self?.state.session(id: id)?.phase
+        }
 
         monitoring.syntheticClaudeSessionPrefix = Self.syntheticClaudeSessionPrefix
         monitoring.stateAccessor = { [weak self] in self?.state ?? SessionState() }

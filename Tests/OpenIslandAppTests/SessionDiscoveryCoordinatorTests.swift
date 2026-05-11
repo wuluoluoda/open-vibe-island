@@ -91,6 +91,39 @@ struct SessionDiscoveryCoordinatorTests {
             isSessionTracked: { $0 == "tracked" }
         ))
     }
+
+    @Test
+    func codexAppSyncDoesNotReemitAlreadyRunningThread() throws {
+        let status = try codexStatus(type: "active")
+
+        #expect(!CodexAppServerCoordinator.shouldEmitSyncedStatusUpdate(
+            status,
+            currentPhase: .running
+        ))
+        #expect(CodexAppServerCoordinator.shouldEmitSyncedStatusUpdate(
+            status,
+            currentPhase: .completed
+        ))
+    }
+
+    @Test
+    func codexAppSyncOnlyReemitsChangedActionableState() throws {
+        let approval = try codexStatus(type: "active", activeFlags: ["waitingOnApproval"])
+        let input = try codexStatus(type: "active", activeFlags: ["waitingOnUserInput"])
+
+        #expect(!CodexAppServerCoordinator.shouldEmitSyncedStatusUpdate(
+            approval,
+            currentPhase: .waitingForApproval
+        ))
+        #expect(CodexAppServerCoordinator.shouldEmitSyncedStatusUpdate(
+            approval,
+            currentPhase: .running
+        ))
+        #expect(!CodexAppServerCoordinator.shouldEmitSyncedStatusUpdate(
+            input,
+            currentPhase: .waitingForAnswer
+        ))
+    }
 }
 
 private func codexSession(id: String, transcriptPath: String) -> AgentSession {
@@ -124,4 +157,19 @@ private func codexThread(id: String, status: String, updatedAt: Int) throws -> C
     """
 
     return try JSONDecoder().decode(CodexThread.self, from: Data(json.utf8))
+}
+
+private func codexStatus(
+    type: String,
+    activeFlags: [String]? = nil
+) throws -> CodexThreadStatus {
+    let flagsJSON = activeFlags.map { flags in
+        let values = flags.map { "\"\($0)\"" }.joined(separator: ",")
+        return ", \"activeFlags\": [\(values)]"
+    } ?? ""
+    let json = """
+    { "type": "\(type)"\(flagsJSON) }
+    """
+
+    return try JSONDecoder().decode(CodexThreadStatus.self, from: Data(json.utf8))
 }

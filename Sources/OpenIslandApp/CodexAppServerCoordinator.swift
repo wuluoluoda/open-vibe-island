@@ -49,6 +49,11 @@ final class CodexAppServerCoordinator {
     @ObservationIgnored
     var isSessionTracked: ((String) -> Bool)?
 
+    /// Returns the current tracked phase for a session. Used by periodic
+    /// app-server sync to avoid emitting duplicate running updates.
+    @ObservationIgnored
+    var trackedSessionPhase: ((String) -> SessionPhase?)?
+
     private(set) var isConnected = false
     private(set) var connectionState: RuntimeConnectionState = .disconnected {
         didSet {
@@ -151,7 +156,10 @@ final class CodexAppServerCoordinator {
                 // rebuilds the AgentSession and would wipe richer state
                 // already accumulated from hooks or rediscovery.
                 if isSessionTracked?(thread.id) == true {
-                    guard thread.status.type == .active else {
+                    guard Self.shouldEmitSyncedStatusUpdate(
+                        thread.status,
+                        currentPhase: trackedSessionPhase?(thread.id)
+                    ) else {
                         continue
                     }
                     emitStatusUpdate(thread.status, for: thread.id)
@@ -318,6 +326,25 @@ final class CodexAppServerCoordinator {
     }
 
     // MARK: - Helpers
+
+    nonisolated static func shouldEmitSyncedStatusUpdate(
+        _ status: CodexThreadStatus,
+        currentPhase: SessionPhase?
+    ) -> Bool {
+        guard status.type == .active else {
+            return false
+        }
+
+        if status.isWaitingOnApproval {
+            return currentPhase != .waitingForApproval
+        }
+
+        if status.isWaitingOnUserInput {
+            return currentPhase != .waitingForAnswer
+        }
+
+        return currentPhase != .running
+    }
 
     private func emitStatusUpdate(_ status: CodexThreadStatus, for threadId: String) {
         switch status.type {
