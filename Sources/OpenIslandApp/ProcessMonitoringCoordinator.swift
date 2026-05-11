@@ -1032,6 +1032,15 @@ final class ProcessMonitoringCoordinator {
             return nil
         }
 
+        if terminalApp.localizedCaseInsensitiveCompare("Codex.app") == .orderedSame {
+            guard let codexThreadID = jumpTarget.codexThreadID?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !codexThreadID.isEmpty else {
+                return nil
+            }
+            return "\(terminalApp.lowercased()):thread:\(codexThreadID.lowercased())"
+        }
+
         if let terminalSessionID = jumpTarget.terminalSessionID?
             .trimmingCharacters(in: .whitespacesAndNewlines),
            !terminalSessionID.isEmpty {

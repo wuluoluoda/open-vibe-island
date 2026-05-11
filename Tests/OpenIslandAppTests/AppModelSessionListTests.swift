@@ -139,6 +139,57 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func islandListKeepsMultipleCodexAppThreadsInSameProject() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+
+        var firstThread = AgentSession(
+            id: "thread-1",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "First thread is running.",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Codex.app",
+                workspaceName: "open-island",
+                paneTitle: "Codex · open-island",
+                workingDirectory: "/tmp/open-island",
+                codexThreadID: "thread-1"
+            )
+        )
+        firstThread.isCodexAppSession = true
+        firstThread.isProcessAlive = true
+
+        var secondThread = AgentSession(
+            id: "thread-2",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Second thread finished.",
+            updatedAt: now.addingTimeInterval(-30),
+            jumpTarget: JumpTarget(
+                terminalApp: "Codex.app",
+                workspaceName: "open-island",
+                paneTitle: "Codex · open-island",
+                workingDirectory: "/tmp/open-island",
+                codexThreadID: "thread-2"
+            )
+        )
+        secondThread.isCodexAppSession = true
+        secondThread.isProcessAlive = true
+
+        model.state = SessionState(sessions: [firstThread, secondThread])
+
+        #expect(Set(model.surfacedSessions.map(\.id)) == ["thread-1", "thread-2"])
+        #expect(model.liveSessionCount == 2)
+    }
+
+    @Test
     func sessionBootstrapPlaceholderAppearsWhileStartupResolutionIsPending() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()
