@@ -1930,7 +1930,11 @@ private struct IslandSessionRow: View {
             return Color(red: 0.92, green: 0.62, blue: 0.34).opacity(0.9)
         case .stalled, .loopSuspected:
             return Color(red: 0.78, green: 0.70, blue: 0.35).opacity(0.82)
-        case .running, .recentlyCompleted, .completed:
+        case .recentlyCompleted:
+            return Color(red: 0.58, green: 0.64, blue: 0.70).opacity(0.9)
+        case .completed:
+            return .white.opacity(0.42)
+        case .running:
             break
         }
 

@@ -40,6 +40,11 @@ final class OverlayUICoordinator {
     var isSoundMutedAccessor: (() -> Bool)?
 
     @ObservationIgnored
+    var notificationSoundPlayer: (Bool) -> Void = { isMuted in
+        NotificationSoundService.playNotification(isMuted: isMuted)
+    }
+
+    @ObservationIgnored
     var ignoresPointerExitAccessor: (() -> Bool)?
 
     @ObservationIgnored
@@ -309,12 +314,18 @@ final class OverlayUICoordinator {
 
     // MARK: - Notification surfaces
 
-    func presentNotificationSurface(_ surface: IslandSurface) {
+    func playNotificationSound() {
+        notificationSoundPlayer(isSoundMuted)
+    }
+
+    func presentNotificationSurface(_ surface: IslandSurface, playSound: Bool = true) {
         guard surface.isNotificationCard else {
             return
         }
 
-        NotificationSoundService.playNotification(isMuted: isSoundMuted)
+        if playSound {
+            playNotificationSound()
+        }
         notchOpen(reason: .notification, surface: surface)
     }
 

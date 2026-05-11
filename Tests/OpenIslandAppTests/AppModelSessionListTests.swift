@@ -346,11 +346,15 @@ struct AppModelSessionListTests {
     @Test
     func bridgeNotificationIsSuppressedWhenSessionIsAlreadyFrontmost() async throws {
         let now = Date(timeIntervalSince1970: 2_000)
+        var playedSoundCount = 0
         let model = AppModel(
             isNotificationSessionAlreadyFrontmost: { session in
                 session.id == "frontmost-session"
             }
         )
+        model.overlay.notificationSoundPlayer = { _ in
+            playedSoundCount += 1
+        }
         model.notchStatus = .closed
         model.notchOpenReason = nil
         model.state = SessionState(
@@ -392,14 +396,19 @@ struct AppModelSessionListTests {
         #expect(model.notchStatus == .closed)
         #expect(model.notchOpenReason == nil)
         #expect(model.islandSurface == .sessionList())
+        #expect(playedSoundCount == 1)
     }
 
     @Test
     func bridgeNotificationStillPresentsWhenSessionIsNotFrontmost() async throws {
         let now = Date(timeIntervalSince1970: 2_000)
+        var playedSoundCount = 0
         let model = AppModel(
             isNotificationSessionAlreadyFrontmost: { _ in false }
         )
+        model.overlay.notificationSoundPlayer = { _ in
+            playedSoundCount += 1
+        }
         model.notchStatus = .closed
         model.notchOpenReason = nil
         model.state = SessionState(
@@ -444,6 +453,7 @@ struct AppModelSessionListTests {
         #expect(model.notchStatus == .opened)
         #expect(model.notchOpenReason == .notification)
         #expect(model.islandSurface == .sessionList(actionableSessionID: "background-session"))
+        #expect(playedSoundCount == 1)
     }
 
     @Test

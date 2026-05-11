@@ -1349,8 +1349,11 @@ final class AppModel {
         prewarmJumpTargetsForVisibleSessions()
     }
     func handlePointerExitedIslandSurface() { overlay.handlePointerExitedIslandSurface() }
-    private func presentNotificationSurface(_ surface: IslandSurface) {
-        overlay.presentNotificationSurface(surface)
+    private func playNotificationSound() {
+        overlay.playNotificationSound()
+    }
+    private func presentNotificationSurface(_ surface: IslandSurface, playSound: Bool = true) {
+        overlay.presentNotificationSurface(surface, playSound: playSound)
         prewarmJumpTargets(for: surface.sessionID)
     }
     private func reconcileIslandSurfaceAfterStateChange() { overlay.reconcileIslandSurfaceAfterStateChange() }
@@ -1917,8 +1920,10 @@ final class AppModel {
             return
         }
 
+        playNotificationSound()
+
         guard suppressFrontmostNotifications else {
-            presentNotificationSurface(surface)
+            presentNotificationSurface(surface, playSound: false)
             return
         }
 
@@ -1935,7 +1940,7 @@ final class AppModel {
                 return
             }
 
-            self.presentNotificationSurface(surface)
+            self.presentNotificationSurface(surface, playSound: false)
         }
     }
 
