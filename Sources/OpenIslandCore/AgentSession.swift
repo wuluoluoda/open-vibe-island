@@ -485,6 +485,7 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
 
 public extension AgentSession {
     static let completedVisibilityRetention: TimeInterval = 2 * 60 * 60
+    static let emptyCodexAppShellVisibilityRetention: TimeInterval = 20 * 60
 
     var isDemoSession: Bool {
         origin == .demo
@@ -516,7 +517,10 @@ public extension AgentSession {
         // Codex.app sessions stay visible while the desktop app is running.
         // Checked before isHookManaged because a Codex.app session may also
         // be hook-managed (when both hook and rediscovery converge on it).
-        if isCodexAppSession { return isProcessAlive }
+        if isCodexAppSession {
+            if isExpiredEmptyCodexAppShell(at: referenceDate) { return false }
+            return isProcessAlive
+        }
         if isHookManaged { return !isSessionEnded }
         if isProcessAlive { return true }
         return false
@@ -525,6 +529,28 @@ public extension AgentSession {
     func isExpiredCompletedSession(at referenceDate: Date) -> Bool {
         phase == .completed
             && referenceDate.timeIntervalSince(updatedAt) >= Self.completedVisibilityRetention
+    }
+
+    func isExpiredEmptyCodexAppShell(at referenceDate: Date) -> Bool {
+        guard isCodexAppSession else {
+            return false
+        }
+
+        guard referenceDate.timeIntervalSince(updatedAt) >= Self.emptyCodexAppShellVisibilityRetention else {
+            return false
+        }
+
+        let meaningfulCodexText = [
+            codexMetadata?.initialUserPrompt,
+            codexMetadata?.lastUserPrompt,
+            codexMetadata?.lastAssistantMessage,
+            codexMetadata?.currentTool,
+            codexMetadata?.currentCommandPreview,
+        ]
+
+        return !meaningfulCodexText.contains { value in
+            value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        }
     }
 
     var currentToolName: String? {

@@ -190,6 +190,65 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func islandListHidesOldEmptyCodexAppShells() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+
+        var emptyShell = AgentSession(
+            id: "empty-shell",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Codex updated the current turn.",
+            updatedAt: now.addingTimeInterval(-1_201),
+            jumpTarget: JumpTarget(
+                terminalApp: "Codex.app",
+                workspaceName: "open-island",
+                paneTitle: "Codex · open-island",
+                workingDirectory: "/tmp/open-island",
+                codexThreadID: "empty-shell"
+            ),
+            codexMetadata: CodexSessionMetadata(
+                transcriptPath: "/tmp/rollout-empty-shell.jsonl"
+            )
+        )
+        emptyShell.isCodexAppSession = true
+        emptyShell.isProcessAlive = true
+
+        var realThread = AgentSession(
+            id: "real-thread",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Did useful work.",
+            updatedAt: now.addingTimeInterval(-1_800),
+            jumpTarget: JumpTarget(
+                terminalApp: "Codex.app",
+                workspaceName: "open-island",
+                paneTitle: "Codex · open-island",
+                workingDirectory: "/tmp/open-island",
+                codexThreadID: "real-thread"
+            ),
+            codexMetadata: CodexSessionMetadata(
+                transcriptPath: "/tmp/rollout-real-thread.jsonl",
+                lastUserPrompt: "Fix the status card."
+            )
+        )
+        realThread.isCodexAppSession = true
+        realThread.isProcessAlive = true
+
+        model.state = SessionState(sessions: [emptyShell, realThread])
+
+        #expect(model.surfacedSessions.map(\.id) == ["real-thread"])
+        #expect(model.recentSessions.map(\.id).contains("empty-shell"))
+        #expect(model.liveSessionCount == 1)
+    }
+
+    @Test
     func sessionBootstrapPlaceholderAppearsWhileStartupResolutionIsPending() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()
