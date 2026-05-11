@@ -953,11 +953,16 @@ final class AppModel {
             return []
         }
 
+        let statusesBySessionID = Dictionary(
+            uniqueKeysWithValues: codexSessions.map { session in
+                (session.id, codexOperationalStatus(for: session, at: date))
+            }
+        )
         let grouped = Dictionary(grouping: codexSessions, by: radarProjectName(for:))
         let projects = grouped.compactMap { projectName, sessions -> CodexRadarProject? in
             let topSession = sessions.max { lhs, rhs in
-                let lhsStatus = codexOperationalStatus(for: lhs, at: date)
-                let rhsStatus = codexOperationalStatus(for: rhs, at: date)
+                let lhsStatus = statusesBySessionID[lhs.id] ?? codexOperationalStatus(for: lhs, at: date)
+                let rhsStatus = statusesBySessionID[rhs.id] ?? codexOperationalStatus(for: rhs, at: date)
                 if lhsStatus.stableSortPriority == rhsStatus.stableSortPriority {
                     return lhs.updatedAt < rhs.updatedAt
                 }
@@ -968,9 +973,9 @@ final class AppModel {
                 return nil
             }
 
-            let status = codexOperationalStatus(for: topSession, at: date)
+            let status = statusesBySessionID[topSession.id] ?? codexOperationalStatus(for: topSession, at: date)
             let radarSortPriority = sessions
-                .map { codexOperationalStatus(for: $0, at: date).radarSortPriority }
+                .map { statusesBySessionID[$0.id]?.radarSortPriority ?? status.radarSortPriority }
                 .max() ?? status.radarSortPriority
             let sortedSessions = sessions.sorted { $0.updatedAt > $1.updatedAt }
             let latestSession = sortedSessions.first ?? topSession
@@ -985,7 +990,9 @@ final class AppModel {
                 topStatus: status,
                 sortPriority: radarSortPriority,
                 runningTaskCount: sessions.filter { $0.phase == .running }.count,
-                actionableTaskCount: sessions.filter { codexOperationalStatus(for: $0, at: date).requiresUserAction }.count,
+                actionableTaskCount: sessions.filter {
+                    statusesBySessionID[$0.id]?.requiresUserAction == true
+                }.count,
                 latestSummary: latestSummary,
                 updatedAt: latestSession.updatedAt,
                 primarySessionID: topSession.id,
@@ -2415,9 +2422,14 @@ final class AppModel {
 
     private func computeSessionBuckets() -> (primary: [AgentSession], overflow: [AgentSession]) {
         let now = Date.now
+        let scoresBySessionID = Dictionary(
+            uniqueKeysWithValues: state.sessions.map { session in
+                (session.id, displayPriority(for: session, now: now))
+            }
+        )
         let rankedSessions = state.sessions.sorted { lhs, rhs in
-            let lhsScore = displayPriority(for: lhs, now: now)
-            let rhsScore = displayPriority(for: rhs, now: now)
+            let lhsScore = scoresBySessionID[lhs.id] ?? 0
+            let rhsScore = scoresBySessionID[rhs.id] ?? 0
 
             if lhsScore == rhsScore {
                 if lhs.islandActivityDate == rhs.islandActivityDate {
