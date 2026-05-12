@@ -153,8 +153,12 @@ struct IslandPanelView: View {
         }
     }
 
+    private var typeWhisperClosedPresence: Bool {
+        model.liveSessionCount == 0 && model.typeWhisperSnapshot.shouldSurface
+    }
+
     private var hasClosedPresence: Bool {
-        model.liveSessionCount > 0
+        model.liveSessionCount > 0 || typeWhisperClosedPresence
     }
 
     private var showsIdleEdgeWhenCollapsed: Bool {
@@ -163,15 +167,16 @@ struct IslandPanelView: View {
 
     /// Whether any session has activity worth showing in the closed notch
     private var hasClosedActivity: Bool {
-        guard let session = closedSpotlightSession else {
-            return false
+        if let session = closedSpotlightSession {
+            switch model.codexOperationalStatus(for: session) {
+            case .waitingApproval, .waitingInput, .reconnecting, .connecting, .interrupted, .detached, .stalled, .loopSuspected, .running:
+                return true
+            case .recentlyCompleted, .completed:
+                return false
+            }
         }
-        switch model.codexOperationalStatus(for: session) {
-        case .waitingApproval, .waitingInput, .reconnecting, .connecting, .interrupted, .detached, .stalled, .loopSuspected, .running:
-            return true
-        case .recentlyCompleted, .completed:
-            return false
-        }
+
+        return typeWhisperClosedPresence && model.typeWhisperSnapshot.isLoaded
     }
 
     private var closedSpotlightNeedsAction: Bool {
@@ -179,6 +184,23 @@ struct IslandPanelView: View {
             return false
         }
         return model.codexOperationalStatus(for: session).requiresUserAction
+    }
+
+    private var closedActivityToolName: String? {
+        if let toolName = closedSpotlightSession?.currentToolName {
+            return toolName
+        }
+        return typeWhisperClosedPresence ? "TypeWhisper" : nil
+    }
+
+    private var closedActivityPreview: String? {
+        if let preview = closedSpotlightSession?.currentCommandPreviewText {
+            return preview
+        }
+        guard typeWhisperClosedPresence else {
+            return nil
+        }
+        return typeWhisperStatusTitle(model.typeWhisperSnapshot)
     }
 
     /// Scout icon tint: blue if any running, green if any live, else gray.
@@ -193,12 +215,18 @@ struct IslandPanelView: View {
         if !sessions.isEmpty {
             return Color(red: 0.26, green: 0.91, blue: 0.42) // #42E86B idle green
         }
+        if typeWhisperClosedPresence {
+            return typeWhisperTint(model.typeWhisperSnapshot)
+        }
         return Color.white.opacity(0.4) // gray
     }
 
+    private var closedBadgeText: String {
+        model.liveSessionCount > 0 ? "\(model.liveSessionCount)" : "TW"
+    }
+
     private var countBadgeWidth: CGFloat {
-        let digits = max(1, "\(model.liveSessionCount)".count)
-        return CGFloat(26 + max(0, digits - 1) * 8)
+        CGFloat(26 + max(0, closedBadgeText.count - 1) * 8)
     }
 
     private var expansionWidth: CGFloat {
@@ -429,8 +457,8 @@ struct IslandPanelView: View {
                         .frame(width: closedNotchWidth - NotchShape.closedTopRadius + (isPopping ? 18 : 0))
                         .overlay(
                             CentralActivityLabel(
-                                toolName: closedSpotlightSession?.currentToolName,
-                                preview: closedSpotlightSession?.currentCommandPreviewText,
+                                toolName: closedActivityToolName,
+                                preview: closedActivityPreview,
                                 isVisible: isExternalDisplayPlacement && hasClosedPresence
                             )
                         )
@@ -438,8 +466,8 @@ struct IslandPanelView: View {
 
                 if hasClosedPresence {
                     let attentionBalanceWidth: CGFloat = closedSpotlightNeedsAction ? 18 : 0
-                    ClosedCountBadge(
-                        liveCount: model.liveSessionCount,
+                    ClosedTextBadge(
+                        title: closedBadgeText,
                         tint: closedSpotlightNeedsAction ? .orange : scoutTint
                     )
                     .matchedGeometryEffect(id: "right-indicator", in: notchNamespace, isSource: true)
@@ -539,6 +567,10 @@ struct IslandPanelView: View {
                 installHooksHint
             }
 
+            if model.typeWhisperSnapshot.shouldSurface {
+                typeWhisperStatusPanel(referenceDate: referenceDate)
+            }
+
             if model.shouldShowSessionBootstrapPlaceholder {
                 sessionBootstrapPlaceholder
             } else if model.islandListSessions.isEmpty {
@@ -624,6 +656,247 @@ struct IslandPanelView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func typeWhisperStatusPanel(referenceDate: Date) -> some View {
+        let snapshot = model.typeWhisperSnapshot
+        let tint = typeWhisperTint(snapshot)
+        let chips = typeWhisperChips(snapshot, referenceDate: referenceDate)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(tint.opacity(0.18))
+                        .frame(width: 30, height: 30)
+                    Image(systemName: "waveform")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(tint)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 7) {
+                        Text("TypeWhisper")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.92))
+
+                        typeWhisperPill(typeWhisperStatusTitle(snapshot), tint: tint)
+                    }
+
+                    Text(typeWhisperDetailLine(snapshot, referenceDate: referenceDate))
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                Button {
+                    model.refreshTypeWhisperFootprint()
+                } label: {
+                    Image(systemName: model.isRefreshingTypeWhisperFootprint ? "hourglass" : "arrow.clockwise")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.68))
+                        .frame(width: 24, height: 24)
+                        .background(Color.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
+                .buttonStyle(.borderless)
+                .disabled(model.isRefreshingTypeWhisperFootprint || snapshot.processID == nil)
+                .help("Refresh TypeWhisper memory")
+            }
+
+            ViewThatFits(in: .horizontal) {
+                typeWhisperChipRow(chips)
+                typeWhisperChipRow(Array(chips.prefix(4)))
+                typeWhisperChipRow(Array(chips.prefix(3)))
+            }
+
+            if snapshot.apiServerEnabled {
+                HStack(spacing: 5) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("API Server on may delay auto-unload.")
+                        .font(.system(size: 10, weight: .medium))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.orange.opacity(0.86))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.035))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(tint.opacity(0.18), lineWidth: 0.5)
+        )
+    }
+
+    private func typeWhisperChipRow(_ chips: [String]) -> some View {
+        HStack(spacing: 5) {
+            ForEach(chips, id: \.self) { chip in
+                typeWhisperPill(chip, tint: .white.opacity(0.58))
+            }
+        }
+        .lineLimit(1)
+    }
+
+    private func typeWhisperPill(_ title: String, tint: Color) -> some View {
+        Text(title)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color.black.opacity(0.34), in: Capsule())
+    }
+
+    private func typeWhisperTint(_ snapshot: TypeWhisperSnapshot) -> Color {
+        if snapshot.apiServerEnabled {
+            return .orange.opacity(0.9)
+        }
+
+        switch snapshot.resolvedLoadState {
+        case .notRunning:
+            return .white.opacity(0.42)
+        case .unloaded:
+            return Color(red: 0.29, green: 0.86, blue: 0.46)
+        case .loaded:
+            return Color(red: 0.34, green: 0.61, blue: 0.99)
+        }
+    }
+
+    private func typeWhisperStatusTitle(_ snapshot: TypeWhisperSnapshot) -> String {
+        switch snapshot.resolvedLoadState {
+        case .notRunning:
+            return "Not running"
+        case .unloaded:
+            return "Model unloaded"
+        case .loaded:
+            let modelName = snapshot.effectiveModelName?.lowercased() ?? ""
+            let engine = snapshot.selectedEngine?.lowercased() ?? ""
+            if modelName.contains("qwen3") || engine == "qwen3" {
+                return "Qwen3 loaded"
+            }
+            return "Model loaded"
+        }
+    }
+
+    private func typeWhisperDetailLine(
+        _ snapshot: TypeWhisperSnapshot,
+        referenceDate: Date
+    ) -> String {
+        switch snapshot.resolvedLoadState {
+        case .notRunning:
+            return "App process is not running."
+        case .unloaded:
+            if snapshot.loadedModelFromPreferences?.nonEmpty != nil,
+               let memory = snapshot.memoryFootprintMegabytes,
+               memory < TypeWhisperSnapshot.unloadedFootprintThresholdMegabytes {
+                return "Preferences still list a model; memory reads unloaded."
+            }
+            return "Running with no resident local model."
+        case .loaded:
+            let modelName = snapshot.effectiveModelName ?? "local model"
+            if let loadedSince = snapshot.loadedSince {
+                return "\(modelName) · loaded \(elapsedLabel(since: loadedSince, at: referenceDate))"
+            }
+            return "\(modelName) · preference-backed state"
+        }
+    }
+
+    private func typeWhisperChips(
+        _ snapshot: TypeWhisperSnapshot,
+        referenceDate: Date
+    ) -> [String] {
+        var chips: [String] = []
+
+        if let engine = snapshot.selectedEngine?.nonEmpty {
+            chips.append(engine)
+        }
+
+        if let modelName = snapshot.effectiveModelName {
+            chips.append(modelName)
+        }
+
+        chips.append(snapshot.apiServerEnabled ? "API on" : "API off")
+
+        if let seconds = snapshot.modelAutoUnloadSeconds {
+            chips.append("Unload \(durationLabel(seconds: seconds))")
+        }
+
+        if let memory = snapshot.memoryFootprintMegabytes {
+            chips.append("Mem \(memoryLabel(memory))")
+        } else if snapshot.isRunning {
+            chips.append("Mem manual")
+        }
+
+        if let expected = expectedUnloadDate(for: snapshot) {
+            chips.append(referenceDate >= expected ? "Unload overdue" : "ETA \(elapsedLabel(until: expected, at: referenceDate))")
+        }
+
+        if let hotkey = snapshot.hybridHotkey?.nonEmpty {
+            chips.append(hotkey)
+        }
+
+        return chips
+    }
+
+    private func expectedUnloadDate(for snapshot: TypeWhisperSnapshot) -> Date? {
+        guard let loadedSince = snapshot.loadedSince,
+              let seconds = snapshot.modelAutoUnloadSeconds,
+              seconds > 0 else {
+            return nil
+        }
+        return loadedSince.addingTimeInterval(TimeInterval(seconds))
+    }
+
+    private func durationLabel(seconds: Int) -> String {
+        if seconds >= 3_600 {
+            let hours = seconds / 3_600
+            let minutes = (seconds % 3_600) / 60
+            return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
+        }
+        if seconds >= 60 {
+            return "\(seconds / 60) min"
+        }
+        return "\(seconds)s"
+    }
+
+    private func elapsedLabel(since date: Date, at referenceDate: Date) -> String {
+        let seconds = max(0, Int(referenceDate.timeIntervalSince(date)))
+        if seconds < 60 {
+            return "<1m"
+        }
+        if seconds < 3_600 {
+            return "\(seconds / 60)m"
+        }
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
+    }
+
+    private func elapsedLabel(until date: Date, at referenceDate: Date) -> String {
+        let seconds = max(0, Int(date.timeIntervalSince(referenceDate)))
+        if seconds < 60 {
+            return "<1m"
+        }
+        if seconds < 3_600 {
+            return "\(seconds / 60)m"
+        }
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
+    }
+
+    private func memoryLabel(_ megabytes: Double) -> String {
+        if megabytes >= 1_024 {
+            return String(format: "%.1fGB", megabytes / 1_024)
+        }
+        return "\(Int(megabytes.rounded()))MB"
     }
 
     private var actionableSessionID: String? {
@@ -2368,14 +2641,14 @@ private struct AttentionIndicator: View {
     }
 }
 
-// MARK: - Closed count badge (right side of closed notch)
+// MARK: - Closed status badge (right side of closed notch)
 
-private struct ClosedCountBadge: View {
-    let liveCount: Int
+private struct ClosedTextBadge: View {
+    let title: String
     let tint: Color
 
     var body: some View {
-        Text("\(liveCount)")
+        Text(title)
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(tint)
             .padding(.horizontal, 8)
@@ -2479,6 +2752,9 @@ private struct CentralActivityLabel: View {
         }
         if lower.contains("web") || lower.contains("fetch") {
             return "globe"
+        }
+        if lower.contains("typewhisper") || lower.contains("voice") || lower.contains("dictation") {
+            return "waveform"
         }
         if lower.contains("task") || lower.contains("agent") || lower.contains("subagent") {
             return "sparkles"

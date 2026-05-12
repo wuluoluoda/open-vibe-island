@@ -95,6 +95,7 @@ final class AppModel {
     let overlay = OverlayUICoordinator()
     let discovery = SessionDiscoveryCoordinator()
     let monitoring = ProcessMonitoringCoordinator()
+    let typeWhisperMonitor = TypeWhisperMonitor()
     let codexAppServer = CodexAppServerCoordinator()
     let updateChecker = UpdateChecker()
 
@@ -168,6 +169,8 @@ final class AppModel {
     var kimiHookStatusSummary: String { hooks.kimiHookStatusSummary }
     var codexHookStatusTitle: String { hooks.codexHookStatusTitle }
     var codexHookStatusSummary: String { hooks.codexHookStatusSummary }
+    var typeWhisperSnapshot: TypeWhisperSnapshot { typeWhisperMonitor.snapshot }
+    var isRefreshingTypeWhisperFootprint: Bool { typeWhisperMonitor.isRefreshingFootprint }
 
     /// Mirrors `AgentIntentStore.firstLaunchCompleted`. Onboarding sets this
     /// to true after the user completes (or explicitly skips) the flow;
@@ -839,6 +842,9 @@ final class AppModel {
                 minimumInterval: self.codexAppRediscoveryInterval
             )
         }
+        typeWhisperMonitor.onSnapshotChanged = { [weak self] in
+            self?.refreshOverlayPlacementIfVisible()
+        }
 
         refreshOverlayDisplayConfiguration()
         applyEnergySettings()
@@ -889,6 +895,7 @@ final class AppModel {
         monitoring.energyProfile = energyProfile
         monitoring.jumpTargetPrecisionProfile = jumpTargetPrecisionProfile
         monitoring.attachmentReconciliationProfile = attachmentReconciliationProfile
+        typeWhisperMonitor.energyProfile = energyProfile
         hooks.configureUsageRefreshMonitoring(
             profile: usageRefreshProfile,
             includeCodex: showCodexUsage
@@ -1217,6 +1224,7 @@ final class AppModel {
             hooks.refreshOpenCodePluginStatus()
             hooks.refreshCursorHookStatus()
             updateChecker.startIfNeeded()
+            typeWhisperMonitor.startMonitoringIfNeeded()
 
         } else {
             isResolvingInitialLiveSessions = false
@@ -1423,6 +1431,10 @@ final class AppModel {
 
     func toggleSoundMuted() {
         isSoundMuted.toggle()
+    }
+
+    func refreshTypeWhisperFootprint() {
+        typeWhisperMonitor.refreshFootprintNow()
     }
 
     func approveFocusedPermission(_ approved: Bool) {
