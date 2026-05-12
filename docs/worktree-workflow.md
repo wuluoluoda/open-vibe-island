@@ -1,73 +1,88 @@
-# Branch Workflow
+# Worktree Playbook
 
-This file keeps its historical `worktree-workflow.md` name for existing links,
-but the current default workflow is branch-only in the current checkout.
+This is an optional isolation playbook, not the default repository workflow.
+Use it only when the user explicitly asks for a worktree, asks for parallel
+isolated checkouts, or agrees that a risky/long-running slice should be kept
+outside the current checkout.
+
+For ordinary Codex work, follow `AGENTS.md` and
+`.codex/skills/open-island-workflow/SKILL.md`: work in the current checkout on
+a focused topic branch, commit there, and do not merge back into `dev` or
+another branch unless the user explicitly asks.
 
 ## Goals
 
-- keep `main` stable enough to integrate and verify
-- keep each change on a focused, reviewable branch
+- keep `main` and `dev` stable while isolated work is underway
+- give each parallel agent or human one separate checkout when needed
 - reduce accidental interference across unrelated slices
 - keep merge and rollback boundaries obvious
-- avoid extra Git worktrees unless the user explicitly asks for them
+- make cleanup predictable after the isolated branch is integrated
 
 ## Roles
 
-### 1. Local development checkout
+### 1. Current development checkout
 
 - Path: `/Users/wuluoluo/work/code.app.org/open-vibe-island`
 - Usual branch: `dev`
-- Purpose: develop, run, and verify the current local Dev app
+- Purpose: normal development, running, and verification of the local Dev app
 
 Rules:
 
-- Use this checkout as the normal place to work.
-- Create or switch to a focused topic branch in this checkout before editing.
-- Do not create a new Git worktree unless the user explicitly asks for one.
-- Refresh `~/Applications/Open Island Dev.app` from the current checkout and
-  branch when bundle semantics, LaunchServices, or installed-hook behavior
-  matter.
-- Do not merge or fast-forward completed work into `dev` or another local
-  testing branch unless the user explicitly asks for that integration.
+- This is the default place to work.
+- Do not create a worktree from here unless the user explicitly asks.
+- When the user does ask for a worktree, start from a clean status in this
+  checkout whenever possible.
 
-### 2. Topic branches
+### 2. Optional topic worktrees
 
+- Path pattern: `/Users/wuluoluo/work/code.app.org/open-vibe-island-<topic>`
 - Branch pattern: `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, or
   `investigate/<topic>`
-- Purpose: isolate one coherent slice in the current checkout
+- Purpose: isolated implementation for one coherent slice
 
 Rules:
 
+- One worktree owns one branch.
 - One branch should represent one coherent slice.
-- Keep each branch focused on a narrow file ownership area when possible.
+- If multiple agents are working in parallel, each gets a separate worktree and
+  branch.
 - If two slices would touch many of the same files, do not run them in parallel
   unless one slice clearly owns the shared files.
-- If parallel work truly needs separate checkouts, create worktrees only after
-  the user asks for that setup.
+- Do not merge or fast-forward completed work into `dev`, `main`, or another
+  local testing branch unless the user explicitly asks for that integration.
 
 ## Standard Lifecycle
 
-### Start a topic branch
+### Create a topic worktree
 
-From the current checkout:
+Use this only after the user has explicitly asked for a worktree.
 
-```bash
-git status -sb
-git switch -c <branch-name>
-```
-
-Example:
+From the current development checkout, or any clean checkout:
 
 ```bash
 git status -sb
-git switch -c feat/island-polish
+git fetch origin
+git worktree add /Users/wuluoluo/work/code.app.org/open-vibe-island-<topic> -b <branch-name> <start-point>
 ```
 
-If the current branch is already the right focused branch, keep using it.
+Choose `<start-point>` deliberately:
 
-## Work on the branch
+- Use `origin/main` for independent feature work intended for PR review.
+- Use local `dev` only when the user asks to isolate a fix for behavior already
+  visible in the current local Dev app.
 
-Inside the current checkout:
+Examples:
+
+```bash
+git worktree add /Users/wuluoluo/work/code.app.org/open-vibe-island-island-polish -b feat/island-polish origin/main
+git worktree add /Users/wuluoluo/work/code.app.org/open-vibe-island-row-jump -b fix/row-jump dev
+```
+
+State the chosen start point before editing.
+
+## Work inside the topic worktree
+
+Inside the topic worktree:
 
 ```bash
 git status -sb
@@ -92,12 +107,13 @@ git rebase origin/main
 If rebase is risky for that slice, merge `origin/main` into the topic branch
 explicitly instead.
 
-## Integrate back into `main`
+## Integrate Back Into `main`
 
 First make sure the topic branch is committed and verified.
 
-Push the feature branch and open a PR targeting `main`. After the PR merges,
-update a clean `main` checkout if one is being used:
+Push the feature branch and open a PR targeting `main` when the user asks for
+remote review or integration. After the PR merges, update any local `main`
+checkout being used:
 
 ```bash
 git switch main
@@ -105,18 +121,32 @@ git fetch origin
 git pull --ff-only origin main
 ```
 
-## Push policy
+## Local Dev App Integration
 
-- Push topic branches when you want backup, review, or collaboration.
+Do not integrate a topic worktree back into `dev` automatically.
+
+Only when the user explicitly asks to test or integrate that branch into the
+local Dev app:
+
+1. make sure the topic worktree is committed and verified
+2. switch to the development checkout
+3. merge or fast-forward the requested branch into `dev`
+4. run `zsh scripts/launch-dev-app.sh`
+5. confirm the running process or binary timestamp
+
+## Push Policy
+
+- Push topic branches when the user wants backup, review, or collaboration.
 - Do not push `main` directly.
-- Merge through PRs, then update any local `main` checkout with
-  `git pull --ff-only`.
+- Do not push `dev` unless the user explicitly asks.
+- Merge through PRs for `main`.
 
 ## Cleanup
 
-After the topic branch is merged:
+After the topic branch is merged and the user agrees cleanup is appropriate:
 
 ```bash
+git worktree remove /Users/wuluoluo/work/code.app.org/open-vibe-island-<topic>
 git branch -d <branch-name>
 ```
 
@@ -126,23 +156,22 @@ If the branch was pushed upstream:
 git push origin --delete <branch-name>
 ```
 
-Only remove a worktree if the user explicitly asked to create one for that
-workstream.
-
 ## Recommended Conventions
 
 - Keep topic names short and concrete: `codex-hooks-noise`,
   `island-geometry`, `claude-usage`.
-- Do not leave long-lived unmerged branches drifting far away from
+- Prefer sibling directories under `/Users/wuluoluo/work/code.app.org/` so
+  isolated checkouts stay easy to discover.
+- Do not leave long-lived unmerged worktrees drifting far away from
   `origin/main`.
-- If a branch becomes exploratory rather than shippable, rename it into
-  `investigate/<topic>` or close it.
+- If a worktree becomes exploratory rather than shippable, rename the branch
+  into `investigate/<topic>` or close it.
 - When assigning work to multiple agents, split by file ownership or subsystem,
   not by vague goal.
 
 ## Related Project Skill
 
-This repository's current branch-only workflow and local Dev app verification
+This repository's default branch-only workflow and local Dev app verification
 steps are maintained in the project skill:
 
 - `.codex/skills/open-island-workflow/SKILL.md`
@@ -157,6 +186,6 @@ Good parallel split:
 
 Bad split:
 
-- two branches both editing `AppModel.swift`
+- two worktrees both editing `AppModel.swift`
 - one branch mixing hook installer work, island UI changes, and docs cleanup
 - direct feature edits on `main`
