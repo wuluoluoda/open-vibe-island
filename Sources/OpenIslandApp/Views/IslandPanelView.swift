@@ -900,7 +900,8 @@ struct IslandPanelView: View {
                     onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
                     onReply: TerminalTextSender.canReply(to: session, enabled: model.completionReplyEnabled)
                         ? { model.replyToSession(session, text: $0) } : nil,
-                    onJump: { model.jumpToSession(session) }
+                    onJump: { model.jumpToSession(session) },
+                    onDelete: { model.removeSessionCard(session.id) }
                 )
 
                 if model.allSessions.count > 1 {
@@ -931,6 +932,7 @@ struct IslandPanelView: View {
                         onReply: TerminalTextSender.canReply(to: session, enabled: model.completionReplyEnabled)
                             ? { model.replyToSession(session, text: $0) } : nil,
                         onJump: { model.jumpToSession(session) },
+                        onDelete: { model.removeSessionCard(session.id) },
                         onDismiss: session.isRemote ? { model.dismissSession(session.id) } : nil
                     )
                 }
@@ -1627,6 +1629,7 @@ private struct IslandSessionRow: View {
     var onAnswer: ((QuestionPromptResponse) -> Void)?
     var onReply: ((String) -> Void)?
     let onJump: () -> Void
+    let onDelete: () -> Void
     var onDismiss: (() -> Void)?
 
     @State private var isHighlighted = false
@@ -1793,6 +1796,13 @@ private struct IslandSessionRow: View {
         .onHover { hovering in
             guard isInteractive else { return }
             isHighlighted = hovering
+        }
+        .contextMenu {
+            if isInteractive {
+                Button(role: .destructive, action: onDelete) {
+                    Label(lang.t("island.card.delete"), systemImage: "trash")
+                }
+            }
         }
         .onChange(of: isInteractive) { _, interactive in
             if !interactive {

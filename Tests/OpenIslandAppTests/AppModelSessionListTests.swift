@@ -66,6 +66,58 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func removeSessionCardDeletesCardAndSelectsRemainingSession() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+
+        var removedSession = AgentSession(
+            id: "delete-me",
+            title: "Delete me",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Working",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "delete",
+                paneTitle: "codex ~/delete",
+                workingDirectory: "/tmp/delete",
+                terminalSessionID: "ghostty-delete"
+            )
+        )
+        removedSession.isProcessAlive = true
+
+        var remainingSession = AgentSession(
+            id: "keep-me",
+            title: "Keep me",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Working",
+            updatedAt: now.addingTimeInterval(-5),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "keep",
+                paneTitle: "codex ~/keep",
+                workingDirectory: "/tmp/keep",
+                terminalSessionID: "ghostty-keep"
+            )
+        )
+        remainingSession.isProcessAlive = true
+
+        model.state = SessionState(sessions: [removedSession, remainingSession])
+        model.selectedSessionID = removedSession.id
+
+        model.removeSessionCard(removedSession.id)
+
+        #expect(model.state.session(id: removedSession.id) == nil)
+        #expect(model.surfacedSessions.map(\.id) == [remainingSession.id])
+        #expect(model.selectedSessionID == remainingSession.id)
+        #expect(model.lastActionMessage == "Deleted card for Delete me.")
+    }
+
+    @Test
     func islandListDeduplicatesSessionsSharingTheSameLiveGhosttyTerminal() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()

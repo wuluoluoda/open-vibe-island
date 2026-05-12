@@ -187,6 +187,7 @@
 "island.showAll" = "Show all %lld sessions";
 "island.collapseList" = "Collapse list";
 "island.usageWaiting" = "Usage waiting";
+"island.card.delete" = "Delete Card";
 
 
 /* Island Panel - Subagents & Tasks */

@@ -187,6 +187,7 @@
 "island.showAll" = "顯示全部 %lld 個工作階段";
 "island.collapseList" = "收起清單";
 "island.usageWaiting" = "等待用量資料";
+"island.card.delete" = "刪除卡片";
 
 /* Island Panel - Subagents & Tasks */
 "subagents.title" = "子代理 (%lld)";

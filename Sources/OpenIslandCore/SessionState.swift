@@ -447,6 +447,21 @@ public struct SessionState: Equatable, Sendable {
         upsert(session)
     }
 
+    /// Remove a single island card by expiring it through the same visibility
+    /// cleanup path used by completed sessions after their retention window.
+    @discardableResult
+    public mutating func removeSessionCard(id: String, at referenceDate: Date = .now) -> Bool {
+        guard var session = sessionsByID[id] else { return false }
+        session.isSessionEnded = true
+        session.phase = .completed
+        session.permissionRequest = nil
+        session.questionPrompt = nil
+        session.lastTurnInterrupted = false
+        session.updatedAt = referenceDate.addingTimeInterval(-AgentSession.completedVisibilityRetention)
+        upsert(session)
+        return removeInvisibleSessions(at: referenceDate)
+    }
+
     /// Remove sessions that are no longer visible in the island.
     /// Returns `true` if any sessions were removed.
     @discardableResult

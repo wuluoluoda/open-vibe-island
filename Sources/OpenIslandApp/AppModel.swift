@@ -1681,6 +1681,25 @@ final class AppModel {
         synchronizeSelection()
     }
 
+    func removeSessionCard(_ sessionID: String) {
+        guard let session = state.session(id: sessionID) else {
+            return
+        }
+
+        let persistenceScopes = Self.persistenceScopes(for: session.tool)
+        let removed = state.removeSessionCard(id: sessionID)
+        guard removed else {
+            return
+        }
+
+        dismissNotificationSurfaceIfPresent(for: sessionID)
+        reconcileIslandSurfaceAfterStateChange()
+        synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
+        scheduleSessionPersistence(persistenceScopes)
+        lastActionMessage = "Deleted card for \(session.title)."
+    }
+
     func answerQuestion(for sessionID: String, answer: QuestionPromptResponse) {
         guard let session = state.session(id: sessionID) else {
             return

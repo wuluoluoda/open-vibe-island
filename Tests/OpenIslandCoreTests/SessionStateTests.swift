@@ -58,6 +58,47 @@ struct SessionStateTests {
     }
 
     @Test
+    func removeSessionCardExpiresThroughVisibilityCleanup() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        var target = AgentSession(
+            id: "delete-me",
+            title: "Delete me",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .waitingForApproval,
+            summary: "Needs approval",
+            updatedAt: now,
+            permissionRequest: PermissionRequest(
+                title: "Edit config",
+                summary: "Needs access",
+                affectedPath: "/tmp/config.json"
+            )
+        )
+        target.isProcessAlive = true
+
+        var survivor = AgentSession(
+            id: "keep-me",
+            title: "Keep me",
+            tool: .claudeCode,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Still working",
+            updatedAt: now
+        )
+        survivor.isProcessAlive = true
+
+        var state = SessionState(sessions: [target, survivor])
+
+        let removed = state.removeSessionCard(id: target.id, at: now)
+
+        #expect(removed)
+        #expect(state.session(id: target.id) == nil)
+        #expect(state.session(id: survivor.id) != nil)
+        let removedMissing = state.removeSessionCard(id: "missing", at: now)
+        #expect(!removedMissing)
+    }
+
+    @Test
     func resolvesUserActionsAndKeepsSessionsSortedByRecency() {
         let startedAt = Date(timeIntervalSince1970: 2_000)
         var state = SessionState(
