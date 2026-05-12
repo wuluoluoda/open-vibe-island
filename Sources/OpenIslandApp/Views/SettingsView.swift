@@ -237,9 +237,73 @@ struct GeneralSettingsPane: View {
                     set: { model.suppressFrontmostNotifications = $0 }
                 ))
             }
+
+            Section(lang.t("settings.general.typeWhisper.section")) {
+                typeWhisperSettingRow(lang.t("settings.general.typeWhisper.status"), typeWhisperStatusValue)
+                typeWhisperSettingRow(lang.t("settings.general.typeWhisper.engine"), model.typeWhisperSnapshot.selectedEngine ?? "-")
+                typeWhisperSettingRow(lang.t("settings.general.typeWhisper.model"), model.typeWhisperSnapshot.effectiveModelName ?? model.typeWhisperSnapshot.selectedModel ?? "-")
+                typeWhisperSettingRow(lang.t("settings.general.typeWhisper.apiServer"), model.typeWhisperSnapshot.apiServerEnabled ? lang.t("settings.general.typeWhisper.on") : lang.t("settings.general.typeWhisper.off"))
+                typeWhisperSettingRow(lang.t("settings.general.typeWhisper.autoUnload"), typeWhisperAutoUnloadValue)
+                typeWhisperSettingRow(lang.t("settings.general.typeWhisper.memory"), typeWhisperMemoryValue)
+                typeWhisperSettingRow(lang.t("settings.general.typeWhisper.polling"), lang.t("settings.general.typeWhisper.pollingValue"))
+
+                Button(lang.t("settings.general.typeWhisper.refreshMemory")) {
+                    model.refreshTypeWhisperFootprint()
+                }
+                .disabled(!model.typeWhisperStatusEnabled || model.typeWhisperSnapshot.processID == nil)
+            }
         }
         .formStyle(.grouped)
         .navigationTitle(lang.t("settings.tab.general"))
+    }
+
+    private var typeWhisperStatusValue: String {
+        guard model.typeWhisperStatusEnabled else {
+            return lang.t("settings.general.typeWhisper.disabled")
+        }
+
+        switch model.typeWhisperSnapshot.resolvedLoadState {
+        case .notRunning:
+            return lang.t("settings.general.typeWhisper.notRunning")
+        case .unloaded:
+            return lang.t("settings.general.typeWhisper.unloaded")
+        case .loaded:
+            return lang.t("settings.general.typeWhisper.loaded")
+        }
+    }
+
+    private var typeWhisperAutoUnloadValue: String {
+        guard let seconds = model.typeWhisperSnapshot.modelAutoUnloadSeconds else {
+            return "-"
+        }
+        if seconds >= 60 {
+            return "\(seconds / 60) min"
+        }
+        return "\(seconds)s"
+    }
+
+    private var typeWhisperMemoryValue: String {
+        if model.isRefreshingTypeWhisperFootprint {
+            return lang.t("settings.general.typeWhisper.refreshing")
+        }
+        guard let memory = model.typeWhisperSnapshot.memoryFootprintMegabytes else {
+            return lang.t("settings.general.typeWhisper.manualRefresh")
+        }
+        if memory >= 1_024 {
+            return String(format: "%.1f GB", memory / 1_024)
+        }
+        return "\(Int(memory.rounded())) MB"
+    }
+
+    private func typeWhisperSettingRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer(minLength: 12)
+            Text(value)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
     }
 }
 

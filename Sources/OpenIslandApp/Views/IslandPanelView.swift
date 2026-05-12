@@ -601,7 +601,7 @@ struct IslandPanelView: View {
             }
 
             if model.typeWhisperStatusEnabled && model.typeWhisperSnapshot.shouldSurface {
-                typeWhisperStatusPanel(referenceDate: referenceDate)
+                typeWhisperStatusPanel
             }
 
             if model.shouldShowSessionBootstrapPlaceholder {
@@ -691,67 +691,53 @@ struct IslandPanelView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func typeWhisperStatusPanel(referenceDate: Date) -> some View {
+    private var typeWhisperStatusPanel: some View {
         let snapshot = model.typeWhisperSnapshot
         let tint = typeWhisperTint(snapshot)
-        let chips = typeWhisperChips(snapshot, referenceDate: referenceDate)
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                typeWhisperIconView
-                    .frame(width: 28, height: 28)
+        return HStack(spacing: 8) {
+            typeWhisperIconView
+                .frame(width: 20, height: 20)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 7) {
-                        Text("TypeWhisper")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.92))
+            Text("TypeWhisper")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+                .layoutPriority(2)
 
-                        typeWhisperPill(typeWhisperStatusTitle(snapshot), tint: tint)
-                    }
+            typeWhisperPill(typeWhisperStatusTitle(snapshot), tint: tint)
+                .layoutPriority(1)
 
-                    Text(typeWhisperDetailLine(snapshot, referenceDate: referenceDate))
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-
-                Button {
-                    model.refreshTypeWhisperFootprint()
-                } label: {
-                    Image(systemName: model.isRefreshingTypeWhisperFootprint ? "hourglass" : "arrow.clockwise")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.68))
-                        .frame(width: 24, height: 24)
-                        .background(Color.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                }
-                .buttonStyle(.borderless)
-                .disabled(model.isRefreshingTypeWhisperFootprint || snapshot.processID == nil)
-                .help("Refresh TypeWhisper memory")
-            }
-
-            ViewThatFits(in: .horizontal) {
-                typeWhisperChipRow(chips)
-                typeWhisperChipRow(Array(chips.prefix(4)))
-                typeWhisperChipRow(Array(chips.prefix(3)))
+            if let modelLabel = typeWhisperCompactModelLabel(snapshot) {
+                Text(modelLabel)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
 
             if snapshot.apiServerEnabled {
-                HStack(spacing: 5) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 9, weight: .semibold))
-                    Text("API Server on may delay auto-unload.")
-                        .font(.system(size: 10, weight: .medium))
-                        .lineLimit(1)
-                }
-                .foregroundStyle(.orange.opacity(0.86))
+                typeWhisperPill("API on", tint: .orange.opacity(0.86))
             }
+
+            Spacer(minLength: 8)
+
+            Button {
+                model.refreshTypeWhisperFootprint()
+            } label: {
+                Image(systemName: model.isRefreshingTypeWhisperFootprint ? "hourglass" : "arrow.clockwise")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.68))
+                    .frame(width: 24, height: 24)
+                    .background(Color.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            }
+            .buttonStyle(.borderless)
+            .disabled(model.isRefreshingTypeWhisperFootprint || snapshot.processID == nil)
+            .help("Refresh TypeWhisper memory")
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -775,15 +761,6 @@ struct IslandPanelView: View {
                 Circle()
                     .stroke(.white.opacity(0.08), lineWidth: 0.5)
             )
-    }
-
-    private func typeWhisperChipRow(_ chips: [String]) -> some View {
-        HStack(spacing: 5) {
-            ForEach(chips, id: \.self) { chip in
-                typeWhisperPill(chip, tint: .white.opacity(0.58))
-            }
-        }
-        .lineLimit(1)
     }
 
     private func typeWhisperPill(_ title: String, tint: Color) -> some View {
@@ -826,111 +803,22 @@ struct IslandPanelView: View {
         }
     }
 
-    private func typeWhisperDetailLine(
-        _ snapshot: TypeWhisperSnapshot,
-        referenceDate: Date
-    ) -> String {
+    private func typeWhisperCompactModelLabel(_ snapshot: TypeWhisperSnapshot) -> String? {
         switch snapshot.resolvedLoadState {
         case .notRunning:
-            return "App process is not running."
-        case .unloaded:
-            if snapshot.loadedModelFromPreferences?.nonEmpty != nil,
-               let memory = snapshot.memoryFootprintMegabytes,
-               memory < TypeWhisperSnapshot.unloadedFootprintThresholdMegabytes {
-                return "Preferences still list a model; memory reads unloaded."
-            }
-            return "Running with no resident local model."
-        case .loaded:
-            let modelName = snapshot.effectiveModelName ?? "local model"
-            if let loadedSince = snapshot.loadedSince {
-                return "\(modelName) · loaded \(elapsedLabel(since: loadedSince, at: referenceDate))"
-            }
-            return "\(modelName) · preference-backed state"
-        }
-    }
-
-    private func typeWhisperChips(
-        _ snapshot: TypeWhisperSnapshot,
-        referenceDate: Date
-    ) -> [String] {
-        var chips: [String] = []
-
-        if let engine = snapshot.selectedEngine?.nonEmpty {
-            chips.append(engine)
-        }
-
-        if let modelName = snapshot.effectiveModelName {
-            chips.append(modelName)
-        }
-
-        chips.append(snapshot.apiServerEnabled ? "API on" : "API off")
-
-        if let seconds = snapshot.modelAutoUnloadSeconds {
-            chips.append("Unload \(durationLabel(seconds: seconds))")
-        }
-
-        if let memory = snapshot.memoryFootprintMegabytes {
-            chips.append("Mem \(memoryLabel(memory))")
-        } else if snapshot.isRunning {
-            chips.append("Mem manual")
-        }
-
-        if let expected = expectedUnloadDate(for: snapshot) {
-            chips.append(referenceDate >= expected ? "Unload overdue" : "ETA \(elapsedLabel(until: expected, at: referenceDate))")
-        }
-
-        if let hotkey = snapshot.hybridHotkey?.nonEmpty {
-            chips.append(hotkey)
-        }
-
-        return chips
-    }
-
-    private func expectedUnloadDate(for snapshot: TypeWhisperSnapshot) -> Date? {
-        guard let loadedSince = snapshot.loadedSince,
-              let seconds = snapshot.modelAutoUnloadSeconds,
-              seconds > 0 else {
             return nil
+        case .unloaded:
+            return snapshot.selectedModel?.nonEmpty
+        case .loaded:
+            var parts: [String] = []
+            if let model = snapshot.effectiveModelName {
+                parts.append(model)
+            }
+            if let memory = snapshot.memoryFootprintMegabytes {
+                parts.append(memoryLabel(memory))
+            }
+            return parts.isEmpty ? nil : parts.joined(separator: " · ")
         }
-        return loadedSince.addingTimeInterval(TimeInterval(seconds))
-    }
-
-    private func durationLabel(seconds: Int) -> String {
-        if seconds >= 3_600 {
-            let hours = seconds / 3_600
-            let minutes = (seconds % 3_600) / 60
-            return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
-        }
-        if seconds >= 60 {
-            return "\(seconds / 60) min"
-        }
-        return "\(seconds)s"
-    }
-
-    private func elapsedLabel(since date: Date, at referenceDate: Date) -> String {
-        let seconds = max(0, Int(referenceDate.timeIntervalSince(date)))
-        if seconds < 60 {
-            return "<1m"
-        }
-        if seconds < 3_600 {
-            return "\(seconds / 60)m"
-        }
-        let hours = seconds / 3_600
-        let minutes = (seconds % 3_600) / 60
-        return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
-    }
-
-    private func elapsedLabel(until date: Date, at referenceDate: Date) -> String {
-        let seconds = max(0, Int(date.timeIntervalSince(referenceDate)))
-        if seconds < 60 {
-            return "<1m"
-        }
-        if seconds < 3_600 {
-            return "\(seconds / 60)m"
-        }
-        let hours = seconds / 3_600
-        let minutes = (seconds % 3_600) / 60
-        return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
     }
 
     private func memoryLabel(_ megabytes: Double) -> String {
