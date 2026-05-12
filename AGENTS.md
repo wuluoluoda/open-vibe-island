@@ -9,13 +9,13 @@ Keep all work incremental, reviewable, and reversible. Every meaningful round of
 ## Required Workflow
 
 1. Start each round by checking the current repository state with `git status -sb`.
-2. Enter a topic worktree on a feature branch before editing. Do not edit files directly in the shared `main` worktree.
+2. Work in the current checkout on a focused branch before editing. Do not create a new Git worktree unless the user explicitly asks for one, and never edit files directly on `main`.
 3. Read the relevant files before editing. Do not guess repository structure or behavior.
 4. Keep each round focused on a single coherent change.
 5. After making changes, run the most relevant verification available for that round.
 6. Summarize what changed, including any verification gaps.
 7. Commit the round on the feature branch before stopping.
-8. When a change is intended for local app testing, integrate it into the current local testing branch and refresh the running dev app from that branch.
+8. When a change is intended for local app testing, refresh the running dev app from the current checkout and branch.
 
 ## Commit Policy
 
@@ -40,25 +40,23 @@ Keep all work incremental, reviewable, and reversible. Every meaningful round of
 - Add documentation when making architectural or workflow decisions.
 - Prefer native macOS and Swift-friendly project structure for this repository.
 
-## Branching And Worktree Rules
+## Branching Rules
 
-- Treat `/Users/wuluoluo/work/code.app.org/open-vibe-island` as the current local testing worktree for the `dev` workstream unless the user names another branch.
+- Treat `/Users/wuluoluo/work/code.app.org/open-vibe-island` as the current local development checkout, usually on the `dev` workstream unless the user names another branch.
 - Treat `main` as the shared integration branch.
 - Never edit, commit, or push directly on `main`. All changes must go through a feature branch and PR before integration.
-- Use the shared `main` worktree only to inspect repository state, fetch, update with `git pull --ff-only`, and run final verification after PRs merge.
-- Create one worktree per branch and one branch per worktree. Never attach two worktrees to the same branch.
-- Create new worktrees from `origin/main`, not from a locally drifted feature branch.
-- When fixing behavior in the currently running local dev app, create the topic worktree from `dev` and state that choice explicitly.
-- Use sibling worktree paths named like `/Users/wuluoluo/work/code.app.org/open-vibe-island-<topic>`.
+- Use a focused topic branch in the current checkout unless the user explicitly asks to stay on the current branch.
+- Do not create a new Git worktree unless the user explicitly asks for one.
+- When fixing behavior in the currently running local dev app, branch from the current `dev` state in this checkout and state that choice explicitly.
 - Use branch names that match the workstream, such as `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, or `investigate/<topic>`.
-- Keep each worktree focused on one coherent slice with a narrow file ownership area when possible.
+- Keep each branch focused on one coherent slice with a narrow file ownership area when possible.
 - Rebase or merge the latest `origin/main` into the feature branch before integrating it back.
-- Integrate completed work through a PR targeting `main`, then update the shared `main` worktree with `git pull --ff-only`.
-- Remove merged worktrees and delete merged branches after the integration round is complete.
-- If multiple agents are working in parallel, assign each agent its own worktree instead of sharing one checkout.
+- Integrate completed work through a PR targeting `main`, then update any local `main` checkout with `git pull --ff-only`.
+- Delete merged branches after the integration round is complete.
+- If multiple agents are working in parallel and isolation is required, use separate branches or create worktrees only after the user asks for that setup.
 - All PRs must target `main`. Do not chain PRs through another feature branch unless the user explicitly requests that structure.
 
-See [docs/worktree-workflow.md](/Users/wuluoluo/work/code.app.org/open-vibe-island/docs/worktree-workflow.md) for the concrete commands and lifecycle.
+See [docs/worktree-workflow.md](/Users/wuluoluo/work/code.app.org/open-vibe-island/docs/worktree-workflow.md) for the current branch-only lifecycle. The filename is kept for existing links.
 See [.codex/skills/open-island-workflow/SKILL.md](/Users/wuluoluo/work/code.app.org/open-vibe-island/.codex/skills/open-island-workflow/SKILL.md) for the local runtime, tag, and dev/main promotion workflow.
 
 ## Product Boundaries
