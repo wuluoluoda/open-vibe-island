@@ -146,6 +146,16 @@ final class TypeWhisperMonitor {
         }
     }
 
+    func stopMonitoring(resetSnapshot: Bool = false) {
+        monitorTask?.cancel()
+        monitorTask = nil
+        lastAutomaticFootprintDate = nil
+        isRefreshingFootprint = false
+        if resetSnapshot {
+            snapshot = .empty
+        }
+    }
+
     func refreshFootprintNow() {
         Task { @MainActor [weak self] in
             await self?.refresh(forceFootprint: true)

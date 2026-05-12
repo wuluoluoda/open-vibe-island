@@ -27,6 +27,7 @@ final class AppModel {
     private static let completionReplyEnabledDefaultsKey = "feature.completionReply.enabled"
     private static let suppressFrontmostNotificationsDefaultsKey = "app.suppressFrontmostNotifications"
     private static let codexRadarEnabledDefaultsKey = "feature.codex.radar.enabled"
+    private static let typeWhisperStatusEnabledDefaultsKey = "feature.typeWhisper.status.enabled"
     private static let energyProfileDefaultsKey = "app.energyProfile"
     private static let jumpTargetPrecisionProfileDefaultsKey = "app.energy.jumpTargetPrecisionProfile"
     private static let usageRefreshProfileDefaultsKey = "app.energy.usageRefreshProfile"
@@ -171,6 +172,18 @@ final class AppModel {
     var codexHookStatusSummary: String { hooks.codexHookStatusSummary }
     var typeWhisperSnapshot: TypeWhisperSnapshot { typeWhisperMonitor.snapshot }
     var isRefreshingTypeWhisperFootprint: Bool { typeWhisperMonitor.isRefreshingFootprint }
+    var typeWhisperStatusEnabled: Bool = true {
+        didSet {
+            guard hasFinishedInit, typeWhisperStatusEnabled != oldValue else { return }
+            UserDefaults.standard.set(typeWhisperStatusEnabled, forKey: Self.typeWhisperStatusEnabledDefaultsKey)
+            if typeWhisperStatusEnabled {
+                typeWhisperMonitor.startMonitoringIfNeeded()
+            } else {
+                typeWhisperMonitor.stopMonitoring(resetSnapshot: true)
+            }
+            refreshOverlayPlacementIfVisible()
+        }
+    }
 
     /// Mirrors `AgentIntentStore.firstLaunchCompleted`. Onboarding sets this
     /// to true after the user completes (or explicitly skips) the flow;
@@ -675,6 +688,7 @@ final class AppModel {
             Self.completionReplyEnabledDefaultsKey: false,
             Self.suppressFrontmostNotificationsDefaultsKey: true,
             Self.codexRadarEnabledDefaultsKey: true,
+            Self.typeWhisperStatusEnabledDefaultsKey: true,
             Self.energyProfileDefaultsKey: EnergyProfile.balanced.rawValue,
         ])
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
@@ -695,6 +709,7 @@ final class AppModel {
         codexLoopSuspectedThreshold = 4
         codexShelfEnabled = codexShelfEnabledOverride ?? false
         codexRadarEnabled = UserDefaults.standard.bool(forKey: Self.codexRadarEnabledDefaultsKey)
+        typeWhisperStatusEnabled = UserDefaults.standard.bool(forKey: Self.typeWhisperStatusEnabledDefaultsKey)
         energyProfile = EnergyProfile(
             rawValue: UserDefaults.standard.integer(forKey: Self.energyProfileDefaultsKey)
         ) ?? .balanced
@@ -1224,7 +1239,9 @@ final class AppModel {
             hooks.refreshOpenCodePluginStatus()
             hooks.refreshCursorHookStatus()
             updateChecker.startIfNeeded()
-            typeWhisperMonitor.startMonitoringIfNeeded()
+            if typeWhisperStatusEnabled {
+                typeWhisperMonitor.startMonitoringIfNeeded()
+            }
 
         } else {
             isResolvingInitialLiveSessions = false
@@ -1434,6 +1451,7 @@ final class AppModel {
     }
 
     func refreshTypeWhisperFootprint() {
+        guard typeWhisperStatusEnabled else { return }
         typeWhisperMonitor.refreshFootprintNow()
     }
 

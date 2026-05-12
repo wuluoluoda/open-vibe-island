@@ -154,7 +154,9 @@ struct IslandPanelView: View {
     }
 
     private var typeWhisperClosedPresence: Bool {
-        model.liveSessionCount == 0 && model.typeWhisperSnapshot.shouldSurface
+        model.typeWhisperStatusEnabled
+            && model.liveSessionCount == 0
+            && model.typeWhisperSnapshot.shouldSurface
     }
 
     private var hasClosedPresence: Bool {
@@ -424,7 +426,11 @@ struct IslandPanelView: View {
             HStack(spacing: 0) {
                 if hasClosedPresence {
                     HStack(spacing: 4) {
-                        if model.isCustomAppearance {
+                        if typeWhisperClosedPresence {
+                            typeWhisperIconView
+                                .frame(width: 18, height: 18)
+                                .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: true)
+                        } else if model.isCustomAppearance {
                             IslandPixelGlyph(
                                 tint: scoutTint,
                                 style: model.islandPixelShapeStyle,
@@ -567,7 +573,7 @@ struct IslandPanelView: View {
                 installHooksHint
             }
 
-            if model.typeWhisperSnapshot.shouldSurface {
+            if model.typeWhisperStatusEnabled && model.typeWhisperSnapshot.shouldSurface {
                 typeWhisperStatusPanel(referenceDate: referenceDate)
             }
 
@@ -665,14 +671,8 @@ struct IslandPanelView: View {
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(tint.opacity(0.18))
-                        .frame(width: 30, height: 30)
-                    Image(systemName: "waveform")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(tint)
-                }
+                typeWhisperIconView
+                    .frame(width: 28, height: 28)
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 7) {
@@ -704,6 +704,15 @@ struct IslandPanelView: View {
                 .buttonStyle(.borderless)
                 .disabled(model.isRefreshingTypeWhisperFootprint || snapshot.processID == nil)
                 .help("Refresh TypeWhisper memory")
+
+                Toggle("", isOn: Binding(
+                    get: { model.typeWhisperStatusEnabled },
+                    set: { model.typeWhisperStatusEnabled = $0 }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Show TypeWhisper status")
             }
 
             ViewThatFits(in: .horizontal) {
@@ -734,6 +743,20 @@ struct IslandPanelView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(tint.opacity(0.18), lineWidth: 0.5)
         )
+    }
+
+    private var typeWhisperIconView: some View {
+        Image("typewhisper-icon", bundle: .appResources)
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .scaledToFit()
+            .padding(2)
+            .background(Color.black.opacity(0.32), in: Circle())
+            .overlay(
+                Circle()
+                    .stroke(.white.opacity(0.08), lineWidth: 0.5)
+            )
     }
 
     private func typeWhisperChipRow(_ chips: [String]) -> some View {

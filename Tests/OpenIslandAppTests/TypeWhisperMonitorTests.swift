@@ -92,6 +92,21 @@ struct TypeWhisperMonitorTests {
 
         #expect(reconciled.loadedSince == firstLoadedAt)
     }
+
+    @Test
+    @MainActor
+    func stopMonitoringCanClearSnapshotForDisabledFeature() {
+        let monitor = TypeWhisperMonitor()
+        monitor.snapshot = typeWhisperSnapshot(
+            loadedModel: "qwen3-asr-1.7b-6bit",
+            memoryMegabytes: 2_048
+        )
+
+        monitor.stopMonitoring(resetSnapshot: true)
+
+        #expect(monitor.snapshot == .empty)
+        #expect(!monitor.isRefreshingFootprint)
+    }
 }
 
 private func typeWhisperSnapshot(

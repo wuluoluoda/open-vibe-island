@@ -220,6 +220,10 @@ struct GeneralSettingsPane: View {
                     get: { model.showDockIcon },
                     set: { model.showDockIcon = $0 }
                 ))
+                Toggle(lang.t("settings.general.typeWhisperStatus"), isOn: Binding(
+                    get: { model.typeWhisperStatusEnabled },
+                    set: { model.typeWhisperStatusEnabled = $0 }
+                ))
                 Toggle(lang.t("settings.general.hapticFeedback"), isOn: Binding(
                     get: { model.hapticFeedbackEnabled },
                     set: { model.hapticFeedbackEnabled = $0 }
