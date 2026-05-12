@@ -143,6 +143,23 @@ final class CodexAppServerCoordinator {
         connectionState = .disconnected
     }
 
+    func startTurn(threadID: String, text: String) async throws {
+        if !isConnected {
+            ensureConnected()
+        }
+
+        while connectTask != nil {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+
+        guard let client else {
+            throw CodexAppServerError.notConnected
+        }
+
+        try await client.resumeThread(threadID: threadID)
+        try await client.startTurn(threadID: threadID, text: text)
+    }
+
     // MARK: - Thread sync
 
     private func syncCurrentThreads() async {

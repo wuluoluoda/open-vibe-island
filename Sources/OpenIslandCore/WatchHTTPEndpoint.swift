@@ -92,6 +92,88 @@ public struct WatchStatusResponse: Codable, Sendable {
     public var activeSessionCount: Int
 }
 
+// MARK: - Mobile Session API
+
+public struct MobileSessionSummary: Codable, Sendable {
+    public var id: String
+    public var title: String
+    public var tool: String
+    public var phase: String
+    public var status: String
+    public var workspace: String?
+    public var workingDirectory: String?
+    public var summary: String
+    public var updatedAt: Date
+    public var canReply: Bool
+    public var unreadCompletion: Bool
+
+    public init(
+        id: String,
+        title: String,
+        tool: String,
+        phase: String,
+        status: String,
+        workspace: String?,
+        workingDirectory: String?,
+        summary: String,
+        updatedAt: Date,
+        canReply: Bool,
+        unreadCompletion: Bool
+    ) {
+        self.id = id
+        self.title = title
+        self.tool = tool
+        self.phase = phase
+        self.status = status
+        self.workspace = workspace
+        self.workingDirectory = workingDirectory
+        self.summary = summary
+        self.updatedAt = updatedAt
+        self.canReply = canReply
+        self.unreadCompletion = unreadCompletion
+    }
+}
+
+public struct MobileSessionsResponse: Codable, Sendable {
+    public var sessions: [MobileSessionSummary]
+}
+
+public struct MobileContextItem: Codable, Sendable {
+    public var role: String
+    public var text: String
+    public var timestamp: Date?
+
+    public init(role: String, text: String, timestamp: Date? = nil) {
+        self.role = role
+        self.text = text
+        self.timestamp = timestamp
+    }
+}
+
+public struct MobileSessionDetail: Codable, Sendable {
+    public var session: MobileSessionSummary
+    public var context: [MobileContextItem]
+
+    public init(session: MobileSessionSummary, context: [MobileContextItem]) {
+        self.session = session
+        self.context = context
+    }
+}
+
+public struct MobileReplyRequest: Codable, Sendable {
+    public var text: String
+}
+
+public struct MobileActionResult: Codable, Sendable {
+    public var accepted: Bool
+    public var message: String
+
+    public init(accepted: Bool, message: String) {
+        self.accepted = accepted
+        self.message = message
+    }
+}
+
 // MARK: - Resolution Handler
 
 /// Callback invoked when the Watch/iPhone submits a resolution via `/resolution`.
@@ -99,6 +181,10 @@ public typealias WatchResolutionHandler = @Sendable (WatchResolutionRequest) -> 
 
 /// Callback to query current active session count for `/status`.
 public typealias WatchActiveSessionCountProvider = @Sendable () -> Int
+public typealias MobileSessionsProvider = @Sendable () -> [MobileSessionSummary]
+public typealias MobileSessionDetailProvider = @Sendable (_ sessionID: String) -> MobileSessionDetail?
+public typealias MobileReplyHandler = @Sendable (_ sessionID: String, _ text: String, _ completion: @escaping @Sendable (MobileActionResult) -> Void) -> Void
+public typealias MobileMarkReadHandler = @Sendable (_ sessionID: String) -> Bool
 
 // MARK: - WatchHTTPEndpoint
 
@@ -132,6 +218,10 @@ public final class WatchHTTPEndpoint: @unchecked Sendable {
     // Callbacks
     public var onResolution: WatchResolutionHandler?
     public var activeSessionCountProvider: WatchActiveSessionCountProvider?
+    public var sessionsProvider: MobileSessionsProvider?
+    public var sessionDetailProvider: MobileSessionDetailProvider?
+    public var onReply: MobileReplyHandler?
+    public var onMarkRead: MobileMarkReadHandler?
 
     public init() {
         regeneratePairingCode()
@@ -180,6 +270,12 @@ public final class WatchHTTPEndpoint: @unchecked Sendable {
     public func revokeAllTokens() {
         queue.sync {
             validTokens.removeAll()
+        }
+    }
+
+    public var connectedClientCount: Int {
+        queue.sync {
+            sseConnections.count
         }
     }
 
@@ -282,7 +378,12 @@ public final class WatchHTTPEndpoint: @unchecked Sendable {
 
         let (method, path, headers, body) = parseHTTPRequest(requestString)
 
-        switch (method, path) {
+        let normalizedPath = path.components(separatedBy: "?").first ?? path
+
+        switch (method, normalizedPath) {
+        case ("OPTIONS", _):
+            sendHTTPResponse(connection: connection, status: "204 No Content", body: "")
+
         case ("POST", "/pair"):
             handlePair(body: body, connection: connection)
 
@@ -296,6 +397,26 @@ public final class WatchHTTPEndpoint: @unchecked Sendable {
             handleStatus(headers: headers, connection: connection)
 
         default:
+            if method == "GET", normalizedPath == "/sessions" {
+                handleSessions(headers: headers, connection: connection)
+                return
+            }
+
+            if method == "GET", let sessionID = sessionID(from: normalizedPath, suffix: nil) {
+                handleSessionDetail(sessionID: sessionID, headers: headers, connection: connection)
+                return
+            }
+
+            if method == "POST", let sessionID = sessionID(from: normalizedPath, suffix: "/reply") {
+                handleReply(sessionID: sessionID, body: body, headers: headers, connection: connection)
+                return
+            }
+
+            if method == "POST", let sessionID = sessionID(from: normalizedPath, suffix: "/mark-read") {
+                handleMarkRead(sessionID: sessionID, headers: headers, connection: connection)
+                return
+            }
+
             sendHTTPResponse(connection: connection, status: "404 Not Found", body: #"{"error":"not found"}"#)
         }
     }
@@ -433,6 +554,80 @@ public final class WatchHTTPEndpoint: @unchecked Sendable {
         }
     }
 
+    private func handleSessions(headers: [String: String], connection: NWConnection) {
+        guard authenticateRequest(headers: headers) else {
+            sendHTTPResponse(connection: connection, status: "401 Unauthorized", body: #"{"error":"unauthorized"}"#)
+            return
+        }
+
+        let response = MobileSessionsResponse(sessions: sessionsProvider?() ?? [])
+        sendJSONResponse(connection: connection, status: "200 OK", value: response)
+    }
+
+    private func handleSessionDetail(sessionID: String, headers: [String: String], connection: NWConnection) {
+        guard authenticateRequest(headers: headers) else {
+            sendHTTPResponse(connection: connection, status: "401 Unauthorized", body: #"{"error":"unauthorized"}"#)
+            return
+        }
+
+        guard let detail = sessionDetailProvider?(sessionID) else {
+            sendHTTPResponse(connection: connection, status: "404 Not Found", body: #"{"error":"session not found"}"#)
+            return
+        }
+
+        sendJSONResponse(connection: connection, status: "200 OK", value: detail)
+    }
+
+    private func handleReply(sessionID: String, body: String?, headers: [String: String], connection: NWConnection) {
+        guard authenticateRequest(headers: headers) else {
+            sendHTTPResponse(connection: connection, status: "401 Unauthorized", body: #"{"error":"unauthorized"}"#)
+            return
+        }
+
+        guard let body, let bodyData = body.data(using: .utf8),
+              let request = try? JSONDecoder().decode(MobileReplyRequest.self, from: bodyData) else {
+            sendHTTPResponse(connection: connection, status: "400 Bad Request", body: #"{"error":"invalid body"}"#)
+            return
+        }
+
+        let text = request.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            sendHTTPResponse(connection: connection, status: "400 Bad Request", body: #"{"error":"empty reply"}"#)
+            return
+        }
+
+        guard let onReply else {
+            sendHTTPResponse(connection: connection, status: "503 Service Unavailable", body: #"{"error":"reply unavailable"}"#)
+            return
+        }
+
+        onReply(sessionID, text) { [weak self] result in
+            self?.queue.async { [weak self] in
+                let status = result.accepted ? "200 OK" : "409 Conflict"
+                self?.sendJSONResponse(connection: connection, status: status, value: result)
+            }
+        }
+    }
+
+    private func handleMarkRead(sessionID: String, headers: [String: String], connection: NWConnection) {
+        guard authenticateRequest(headers: headers) else {
+            sendHTTPResponse(connection: connection, status: "401 Unauthorized", body: #"{"error":"unauthorized"}"#)
+            return
+        }
+
+        let accepted = onMarkRead?(sessionID) ?? false
+        guard accepted else {
+            sendHTTPResponse(connection: connection, status: "404 Not Found", body: #"{"error":"session not found"}"#)
+            return
+        }
+
+        sendJSONResponse(
+            connection: connection,
+            status: "200 OK",
+            value: MobileActionResult(accepted: true, message: "marked read")
+        )
+    }
+
     // MARK: - Private: Auth
 
     private func authenticateRequest(headers: [String: String]) -> Bool {
@@ -478,6 +673,9 @@ public final class WatchHTTPEndpoint: @unchecked Sendable {
         Content-Type: \(contentType)\r
         Content-Length: \(body.utf8.count)\r
         Connection: close\r
+        Access-Control-Allow-Origin: *\r
+        Access-Control-Allow-Headers: Authorization, Content-Type\r
+        Access-Control-Allow-Methods: GET, POST, OPTIONS\r
         \r
         \(body)
         """
@@ -486,6 +684,29 @@ public final class WatchHTTPEndpoint: @unchecked Sendable {
         connection.send(content: data, isComplete: true, completion: .contentProcessed { _ in
             connection.cancel()
         })
+    }
+
+    private func sendJSONResponse<T: Encodable>(connection: NWConnection, status: String, value: T) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(value),
+              let body = String(data: data, encoding: .utf8) else {
+            sendHTTPResponse(connection: connection, status: "500 Internal Server Error", body: #"{"error":"encoding failed"}"#)
+            return
+        }
+        sendHTTPResponse(connection: connection, status: status, body: body)
+    }
+
+    private func sessionID(from path: String, suffix: String?) -> String? {
+        guard path.hasPrefix("/sessions/") else { return nil }
+        var value = String(path.dropFirst("/sessions/".count))
+        if let suffix {
+            guard value.hasSuffix(suffix) else { return nil }
+            value = String(value.dropLast(suffix.count))
+        } else if value.contains("/") {
+            return nil
+        }
+        return value.removingPercentEncoding.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     // MARK: - Private: Pairing Code Generation

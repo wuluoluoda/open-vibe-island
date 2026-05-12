@@ -893,6 +893,7 @@ struct IslandPanelView: View {
                     referenceDate: referenceDate,
                     operationalStatus: model.codexOperationalStatus(for: session, at: referenceDate),
                     isActionable: true,
+                    isCompletionUnread: model.isMobileCompletionUnread(session),
                     useDrawingGroup: model.notchStatus == .opened,
                     isInteractive: model.notchStatus == .opened,
                     lang: model.lang,
@@ -924,6 +925,7 @@ struct IslandPanelView: View {
                         referenceDate: referenceDate,
                         operationalStatus: model.codexOperationalStatus(for: session, at: referenceDate),
                         isActionable: session.phase.requiresAttention || session.id == actionableSessionID,
+                        isCompletionUnread: model.isMobileCompletionUnread(session),
                         useDrawingGroup: model.notchStatus == .opened,
                         isInteractive: model.notchStatus == .opened,
                         lang: model.lang,
@@ -1622,6 +1624,7 @@ private struct IslandSessionRow: View {
     let referenceDate: Date
     let operationalStatus: CodexOperationalStatus
     var isActionable: Bool = false
+    var isCompletionUnread: Bool = false
     var useDrawingGroup: Bool = true
     var isInteractive: Bool = true
     var lang: LanguageManager = .shared
@@ -1835,7 +1838,9 @@ private struct IslandSessionRow: View {
         case .running:
             Color(red: 0.34, green: 0.61, blue: 0.99)
         case .recentlyCompleted, .completed:
-            Color(red: 0.29, green: 0.86, blue: 0.46)
+            isCompletionUnread
+                ? Color(red: 0.29, green: 0.86, blue: 0.46)
+                : Color(red: 0.42, green: 0.66, blue: 0.50)
         }
     }
 
@@ -2169,7 +2174,9 @@ private struct IslandSessionRow: View {
         case .running:
             return Color(red: 0.34, green: 0.61, blue: 0.99)
         case .active:
-            return Color(red: 0.29, green: 0.86, blue: 0.46)
+            return isCompletionUnread
+                ? Color(red: 0.29, green: 0.86, blue: 0.46)
+                : Color(red: 0.42, green: 0.66, blue: 0.50)
         case .inactive:
             return .white.opacity(0.38)
         }

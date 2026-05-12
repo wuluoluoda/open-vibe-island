@@ -67,6 +67,24 @@ public enum CodexTurnStatus: String, Codable, Sendable {
     case inProgress
 }
 
+public struct CodexUserInput: Encodable, Sendable {
+    public var type: String
+    public var text: String
+    public var textElements: [String]
+
+    public init(text: String) {
+        self.type = "text"
+        self.text = text
+        self.textElements = []
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case text
+        case textElements = "text_elements"
+    }
+}
+
 struct CodexThreadListResult: Decodable {
     let threads: [CodexThread]
 
@@ -242,6 +260,33 @@ public final class CodexAppServerClient: @unchecked Sendable {
         let data = try await sendRequest(method: "thread/list", params: Params(limit: limit))
         let result = try JSONDecoder().decode(CodexThreadListResult.self, from: data)
         return result.threads
+    }
+
+    /// Load a persisted thread into the app-server if it is not already loaded.
+    public func resumeThread(threadID: String) async throws {
+        struct Params: Encodable {
+            let threadId: String
+            let persistExtendedHistory: Bool
+            let excludeTurns: Bool
+        }
+
+        _ = try await sendRequest(
+            method: "thread/resume",
+            params: Params(threadId: threadID, persistExtendedHistory: false, excludeTurns: true)
+        )
+    }
+
+    /// Start a new turn in an idle/completed Codex.app thread.
+    public func startTurn(threadID: String, text: String) async throws {
+        struct Params: Encodable {
+            let threadId: String
+            let input: [CodexUserInput]
+        }
+
+        _ = try await sendRequest(
+            method: "turn/start",
+            params: Params(threadId: threadID, input: [CodexUserInput(text: text)])
+        )
     }
 
     // MARK: - JSON-RPC transport

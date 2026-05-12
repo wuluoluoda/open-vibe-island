@@ -26,7 +26,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .appearance: lang.t("settings.tab.appearance")
         case .display:    lang.t("settings.tab.display")
         case .sound:      lang.t("settings.tab.sound")
-        case .watch:      "Watch"
+        case .watch:      "Mobile"
         case .shortcuts:  lang.t("settings.tab.shortcuts")
         case .lab:        lang.t("settings.tab.lab")
         case .about:      lang.t("settings.tab.about")
@@ -41,7 +41,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .appearance: "paintbrush.fill"
         case .display:    "textformat.size"
         case .sound:      "speaker.wave.2.fill"
-        case .watch:      "applewatch"
+        case .watch:      "iphone.and.arrow.forward"
         case .shortcuts:  "keyboard.fill"
         case .lab:        "flask.fill"
         case .about:      "info.circle.fill"
@@ -1138,7 +1138,7 @@ struct SetupSettingsPane: View {
     }
 }
 
-// MARK: - Watch
+// MARK: - Mobile Relay
 
 struct WatchSettingsPane: View {
     var model: AppModel
@@ -1148,13 +1148,17 @@ struct WatchSettingsPane: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Watch Notifications", isOn: Binding(
-                    get: { model.watchNotificationEnabled },
-                    set: { model.watchNotificationEnabled = $0 }
+                Toggle("Mobile Relay", isOn: Binding(
+                    get: { model.mobileRelayEnabled },
+                    set: { model.mobileRelayEnabled = $0 }
                 ))
 
-                if model.watchNotificationEnabled {
-                    Text("When enabled, the macOS app broadcasts a Bonjour service that your iPhone can discover on the same WiFi network.")
+                if model.mobileRelayEnabled {
+                    Text("When enabled, Open Island broadcasts a local Bonjour service for paired phones on the same Wi-Fi network.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Off by default to avoid background network work and reduce battery use.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1162,7 +1166,7 @@ struct WatchSettingsPane: View {
                 Text("General")
             }
 
-            if model.watchNotificationEnabled {
+            if model.mobileRelayEnabled {
                 Section("Pairing") {
                     HStack {
                         Text("Pairing Code")
@@ -1172,20 +1176,20 @@ struct WatchSettingsPane: View {
                             .foregroundStyle(.blue)
                     }
 
-                    Text("Enter this code on your iPhone app to pair. Code expires after 2 minutes.")
+                    Text("Enter this code on your Android app to pair. Code expires after 2 minutes.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
                     Button("Refresh Code") {
                         model.watchRelay?.endpoint.regeneratePairingCode()
-                        pairingCode = model.watchPairingCode
+                        pairingCode = model.mobileRelayPairingCode
                     }
                 }
 
                 Section("Paired Devices") {
-                    if model.watchConnectedDevices > 0 {
+                    if model.mobileRelayConnectedDevices > 0 {
                         HStack {
-                            Label("iPhone", systemImage: "iphone")
+                            Label("Phone", systemImage: "iphone")
                             Spacer()
                             HStack(spacing: 4) {
                                 Circle()
@@ -1198,7 +1202,7 @@ struct WatchSettingsPane: View {
                         }
                     } else {
                         HStack {
-                            Label("No devices paired", systemImage: "iphone.slash")
+                            Label("No phones connected", systemImage: "iphone.slash")
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -1210,9 +1214,9 @@ struct WatchSettingsPane: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Watch")
+        .navigationTitle("Mobile")
         .onAppear {
-            pairingCode = model.watchPairingCode
+            pairingCode = model.mobileRelayPairingCode
         }
     }
 }

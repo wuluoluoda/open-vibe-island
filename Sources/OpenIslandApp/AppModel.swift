@@ -25,6 +25,9 @@ final class AppModel {
     private static let islandStatusColorsDefaultsKey = "appearance.island.statusColors"
     private static let showCodexUsageDefaultsKey = "app.showCodexUsage"
     private static let completionReplyEnabledDefaultsKey = "feature.completionReply.enabled"
+    private static let mobileRelayEnabledDefaultsKey = "mobileRelay.enabled"
+    private static let legacyWatchNotificationEnabledKey = "watch.notification.enabled"
+    private static let completedSeenAtDefaultsKey = "mobileRelay.completedSeenAt"
     private static let suppressFrontmostNotificationsDefaultsKey = "app.suppressFrontmostNotifications"
     private static let codexRadarEnabledDefaultsKey = "feature.codex.radar.enabled"
     private static let typeWhisperStatusEnabledDefaultsKey = "feature.typeWhisper.status.enabled"
@@ -81,6 +84,8 @@ final class AppModel {
     private static let loopSignalRetentionWindow: TimeInterval = 20 * 60
     private static let codexShelfMaxTrackedItems = 120
     private static let codexShelfScanMinimumInterval: TimeInterval = 10
+    private static let mobileContextMaxItems = 5
+    private static let mobileContextMaxCharacters = 8_192
 
     let lang = LanguageManager.shared
 
@@ -534,18 +539,16 @@ final class AppModel {
     @ObservationIgnored
     private var hasFinishedInit = false
 
-    // MARK: - Watch Notification
+    // MARK: - Mobile Relay
 
-    private static let watchNotificationEnabledKey = "watch.notification.enabled"
-
-    var watchNotificationEnabled: Bool = false {
+    var mobileRelayEnabled: Bool = false {
         didSet {
-            guard watchNotificationEnabled != oldValue else { return }
-            UserDefaults.standard.set(watchNotificationEnabled, forKey: Self.watchNotificationEnabledKey)
-            if watchNotificationEnabled {
-                startWatchRelay()
+            guard mobileRelayEnabled != oldValue else { return }
+            UserDefaults.standard.set(mobileRelayEnabled, forKey: Self.mobileRelayEnabledDefaultsKey)
+            if mobileRelayEnabled {
+                startMobileRelay()
             } else {
-                stopWatchRelay()
+                stopMobileRelay()
             }
         }
     }
@@ -554,26 +557,38 @@ final class AppModel {
     private(set) var watchRelay: WatchNotificationRelay?
 
     /// Current pairing code for display in the settings UI.
-    var watchPairingCode: String {
+    var mobileRelayPairingCode: String {
         watchRelay?.endpoint.currentCode() ?? "----"
     }
 
-    /// Number of currently connected iPhone SSE clients.
-    var watchConnectedDevices: Int {
-        // Placeholder — endpoint doesn't expose count yet
-        0
+    var watchPairingCode: String {
+        mobileRelayPairingCode
     }
 
-    private func startWatchRelay() {
+    /// Number of currently connected mobile SSE clients.
+    var mobileRelayConnectedDevices: Int {
+        watchRelay?.endpoint.connectedClientCount ?? 0
+    }
+
+    var watchConnectedDevices: Int {
+        mobileRelayConnectedDevices
+    }
+
+    var watchNotificationEnabled: Bool {
+        get { mobileRelayEnabled }
+        set { mobileRelayEnabled = newValue }
+    }
+
+    private func startMobileRelay() {
         guard watchRelay == nil else { return }
         let relay = WatchNotificationRelay()
-        setupWatchRelayCallbacks(relay)
+        setupMobileRelayCallbacks(relay)
         relay.start()
         self.watchRelay = relay
     }
 
-    /// Wire up resolution callbacks so Watch/iPhone actions flow back to the bridge.
-    private func setupWatchRelayCallbacks(_ relay: WatchNotificationRelay) {
+    /// Wire up callbacks so mobile actions flow back into the app model.
+    private func setupMobileRelayCallbacks(_ relay: WatchNotificationRelay) {
         relay.onResolvePermission = { [weak self] sessionID, approved in
             Task { @MainActor [weak self] in
                 self?.approvePermission(for: sessionID, approved: approved)
@@ -596,11 +611,47 @@ final class AppModel {
                 self.state.sessions.count
             }
         }
+
+        relay.endpoint.sessionsProvider = { [weak self] in
+            guard let self else { return [] }
+            return MainActor.assumeIsolated {
+                self.mobileSessionSummaries()
+            }
+        }
+
+        relay.endpoint.sessionDetailProvider = { [weak self] sessionID in
+            guard let self else { return nil }
+            return MainActor.assumeIsolated {
+                self.mobileSessionDetail(sessionID: sessionID)
+            }
+        }
+
+        relay.endpoint.onReply = { [weak self] sessionID, text, completion in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    completion(MobileActionResult(accepted: false, message: "app unavailable"))
+                    return
+                }
+                let result = await self.replyToSessionFromMobile(sessionID: sessionID, text: text)
+                completion(result)
+            }
+        }
+
+        relay.endpoint.onMarkRead = { [weak self] sessionID in
+            guard let self else { return false }
+            return MainActor.assumeIsolated {
+                self.markMobileSessionRead(sessionID)
+            }
+        }
+    }
+
+    private func stopMobileRelay() {
+        watchRelay?.stop()
+        watchRelay = nil
     }
 
     private func stopWatchRelay() {
-        watchRelay?.stop()
-        watchRelay = nil
+        stopMobileRelay()
     }
 
     var ignoresPointerExitDuringHarness = false
@@ -669,6 +720,9 @@ final class AppModel {
     @ObservationIgnored
     private var codexRealtimeEventDatesBySessionID: [String: Date] = [:]
 
+    @ObservationIgnored
+    private var completedSeenAtBySessionID: [String: Date] = [:]
+
     init(
         terminalJumpAction: @escaping @Sendable (JumpTarget) throws -> String = { target in
             try TerminalJumpService().jump(to: target)
@@ -686,6 +740,7 @@ final class AppModel {
             Self.showDockIconDefaultsKey: true,
             Self.hapticFeedbackEnabledDefaultsKey: false,
             Self.completionReplyEnabledDefaultsKey: false,
+            Self.mobileRelayEnabledDefaultsKey: false,
             Self.suppressFrontmostNotificationsDefaultsKey: true,
             Self.codexRadarEnabledDefaultsKey: true,
             Self.typeWhisperStatusEnabledDefaultsKey: true,
@@ -746,9 +801,14 @@ final class AppModel {
             }
             statusColorHexes = colors
         }
-        watchNotificationEnabled = UserDefaults.standard.bool(forKey: Self.watchNotificationEnabledKey)
-        if watchNotificationEnabled {
-            startWatchRelay()
+        completedSeenAtBySessionID = Self.loadCompletedSeenAtBySessionID()
+        if UserDefaults.standard.object(forKey: Self.mobileRelayEnabledDefaultsKey) != nil {
+            mobileRelayEnabled = UserDefaults.standard.bool(forKey: Self.mobileRelayEnabledDefaultsKey)
+        } else {
+            mobileRelayEnabled = UserDefaults.standard.bool(forKey: Self.legacyWatchNotificationEnabledKey)
+        }
+        if mobileRelayEnabled {
+            startMobileRelay()
         }
 
         overlay.appModel = self
@@ -871,6 +931,18 @@ final class AppModel {
             return nil
         }
         return EnergyProfile(rawValue: UserDefaults.standard.integer(forKey: key))
+    }
+
+    private static func loadCompletedSeenAtBySessionID() -> [String: Date] {
+        guard let raw = UserDefaults.standard.dictionary(forKey: Self.completedSeenAtDefaultsKey) as? [String: TimeInterval] else {
+            return [:]
+        }
+        return raw.mapValues { Date(timeIntervalSince1970: $0) }
+    }
+
+    private func persistCompletedSeenAtBySessionID() {
+        let raw = completedSeenAtBySessionID.mapValues(\.timeIntervalSince1970)
+        UserDefaults.standard.set(raw, forKey: Self.completedSeenAtDefaultsKey)
     }
 
     private func persistEnergyProfileOverride(_ profile: EnergyProfile?, forKey key: String) {
@@ -1732,6 +1804,140 @@ final class AppModel {
                 ? "Sent reply to \(session.title)."
                 : "Failed to send reply to \(session.title)."
         }
+    }
+
+    private func replyToSessionFromMobile(sessionID: String, text: String) async -> MobileActionResult {
+        guard let session = state.session(id: sessionID) else {
+            return MobileActionResult(accepted: false, message: "session not found")
+        }
+
+        guard mobileCanReply(to: session) else {
+            return MobileActionResult(accepted: false, message: "session cannot receive replies")
+        }
+
+        if session.isCodexAppSession {
+            let threadID = session.jumpTarget?.codexThreadID ?? session.id
+            guard session.phase == .completed else {
+                return MobileActionResult(accepted: false, message: "Codex thread is busy")
+            }
+
+            do {
+                try await codexAppServer.startTurn(threadID: threadID, text: text)
+                lastActionMessage = "Sent mobile reply to \(session.title)."
+                return MobileActionResult(accepted: true, message: "sent")
+            } catch {
+                lastActionMessage = "Failed mobile reply: \(error.localizedDescription)"
+                return MobileActionResult(accepted: false, message: error.localizedDescription)
+            }
+        }
+
+        let success = await Task.detached(priority: .userInitiated) {
+            TerminalTextSender.send(text, to: session)
+        }.value
+        lastActionMessage = success
+            ? "Sent mobile reply to \(session.title)."
+            : "Failed mobile reply to \(session.title)."
+        return MobileActionResult(accepted: success, message: success ? "sent" : "terminal reply failed")
+    }
+
+    private func mobileSessionSummaries() -> [MobileSessionSummary] {
+        state.sessions
+            .filter(\.isVisibleInIsland)
+            .map(mobileSessionSummary)
+    }
+
+    private func mobileSessionDetail(sessionID: String) -> MobileSessionDetail? {
+        guard let session = state.session(id: sessionID) else {
+            return nil
+        }
+
+        let summary = mobileSessionSummary(session)
+        let rawItems = [
+            session.initialUserPromptText.map { MobileContextItem(role: "user", text: $0) },
+            session.latestUserPromptText.map { MobileContextItem(role: "user", text: $0) },
+            session.completionAssistantMessageText.map { MobileContextItem(role: "assistant", text: $0, timestamp: session.updatedAt) },
+            session.currentCommandPreviewText.map { MobileContextItem(role: "tool", text: $0) },
+            MobileContextItem(role: "status", text: session.summary, timestamp: session.updatedAt),
+        ].compactMap { $0 }
+
+        var seen = Set<String>()
+        var items: [MobileContextItem] = []
+        for item in rawItems where !item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let key = "\(item.role):\(item.text)"
+            guard seen.insert(key).inserted else { continue }
+            items.append(item)
+        }
+
+        items = Array(items.suffix(Self.mobileContextMaxItems))
+        var remaining = Self.mobileContextMaxCharacters
+        items = items.compactMap { item in
+            guard remaining > 0 else { return nil }
+            var trimmed = item
+            if trimmed.text.count > remaining {
+                trimmed.text = String(trimmed.text.prefix(remaining))
+            }
+            remaining -= trimmed.text.count
+            return trimmed
+        }
+
+        return MobileSessionDetail(session: summary, context: items)
+    }
+
+    private func mobileSessionSummary(_ session: AgentSession) -> MobileSessionSummary {
+        let status = codexOperationalStatus(for: session)
+        return MobileSessionSummary(
+            id: session.id,
+            title: session.spotlightHeadlineText,
+            tool: session.tool.displayName,
+            phase: session.phase.rawValue,
+            status: status.label,
+            workspace: session.jumpTarget?.workspaceName,
+            workingDirectory: session.jumpTarget?.workingDirectory,
+            summary: mobileSummaryText(for: session),
+            updatedAt: session.updatedAt,
+            canReply: mobileCanReply(to: session),
+            unreadCompletion: isMobileCompletionUnread(session)
+        )
+    }
+
+    private func mobileSummaryText(for session: AgentSession) -> String {
+        let text = session.spotlightPrimaryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.count <= 240 {
+            return text
+        }
+        return String(text.prefix(240))
+    }
+
+    private func mobileCanReply(to session: AgentSession) -> Bool {
+        if TerminalTextSender.canReply(to: session, enabled: completionReplyEnabled) {
+            return true
+        }
+
+        return completionReplyEnabled
+            && session.isCodexAppSession
+            && session.phase == .completed
+            && (session.jumpTarget?.codexThreadID?.isEmpty == false || !session.id.isEmpty)
+    }
+
+    func isMobileCompletionUnread(_ session: AgentSession) -> Bool {
+        guard session.phase == .completed else {
+            return false
+        }
+        guard let seenAt = completedSeenAtBySessionID[session.id] else {
+            return true
+        }
+        return seenAt < session.updatedAt
+    }
+
+    @discardableResult
+    private func markMobileSessionRead(_ sessionID: String) -> Bool {
+        guard let session = state.session(id: sessionID) else {
+            return false
+        }
+        completedSeenAtBySessionID[sessionID] = session.updatedAt
+        persistCompletedSeenAtBySessionID()
+        refreshOverlayPlacementIfVisible()
+        return true
     }
 
 
